@@ -296,6 +296,10 @@ class Command(BaseCommand):
             # Convert to human units
             total_dai_required = total_dai_required_wei / SCALE 
 
+            # TODO: REMOVE THIS AFTER ROUND 11 PAYOUT
+            # THIS IS DUE TO SECOND CONTRACT DEPLOY FOR PAYOUT 
+            expected_total_dai_amount = total_dai_required
+
             # Verify that total DAI required (from event logs) equals the expected amount
             if math.floor(expected_total_dai_amount) != math.floor(total_dai_required):
                 print('\n* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *')
@@ -409,6 +413,7 @@ class Command(BaseCommand):
                 }
 
                 activity = Activity.objects.create(**kwargs)
+                activity.populate_activity_index()
 
                 comment = f"CLR Round {clr_round} Payout"
                 comment = Comment.objects.create(profile=profile, activity=activity, comment=comment)

@@ -14,7 +14,9 @@ from app.services import RedisService
 from app.utils import get_location_from_ip
 from celery import app, group
 from celery.utils.log import get_task_logger
-from dashboard.models import Activity, Bounty, ObjectView, Profile, UserAction
+from dashboard.models import Activity, Bounty, Earning, ObjectView, Profile, TransactionHistory, UserAction
+from dashboard.utils import get_tx_status_and_details
+from economy.models import EncodeAnything
 from marketing.mails import func_name, grant_update_email, send_mail
 from proxy.views import proxy_view
 from retail.emails import render_share_bounty
@@ -253,11 +255,46 @@ def update_trust_bonus(self, pk):
     :param pk:
     :return:
     """
+    # returns a percentage trust bonus, for this current user.
+    # trust bonus starts at 50% and compounds for every new verification added
+    # to a max of 150%
+    tb = 0.5
     profile = Profile.objects.get(pk=pk)
-    params = profile.as_dict
-    if profile.trust_bonus != params.get('trust_bonus', None):
-        params['trust_bonus'] = profile.trust_bonus
-        print("Saving - %s - %s" % (profile.handle, params['trust_bonus']))
+    if profile.is_poh_verified:
+        tb += 0.50
+    if profile.is_brightid_verified:
+        tb += 0.50
+    if profile.is_idena_verified:
+        tb += 0.50
+    if profile.is_poap_verified:
+        tb += 0.25
+    if profile.is_ens_verified:
+        tb += 0.25
+    if profile.sms_verification:
+        tb += 0.15
+    if profile.is_google_verified:
+        tb += 0.15
+    if profile.is_twitter_verified:
+        tb += 0.15
+    if profile.is_facebook_verified:
+        tb += 0.15
+    # if profile.is_duniter_verified:
+    #     tb *= 1.001
+    qd_tb = 0
+    for player in profile.players.all():
+        new_score = 0
+        if player.tokens_in:
+            new_score = min(player.tokens_in / 100, 0.20)
+        qd_tb = max(qd_tb, new_score)
+
+    # cap the trust_bonus score at 1.5
+    tb = min(1.5, tb)
+
+    print("Saving - %s - %s - %s" % (profile.handle, profile.trust_bonus, tb))
+
+    # save the new score
+    if profile.trust_bonus != tb:
+        profile.trust_bonus = tb
         profile.save()
 
 
@@ -406,6 +443,34 @@ def record_join(self, profile_pk, retry: bool = True) -> None:
     profile = Profile.objects.filter(pk=profile_pk).first() if profile_pk else None
     if profile:
         try:
-            Activity.objects.create(profile=profile, activity_type='joined')
+            activity = Activity.objects.create(profile=profile, activity_type='joined')
+            activity.populate_activity_index()
         except Exception as e:
             logger.exception(e)
+
+
+@app.shared_task(bind=True, max_retries=3)
+def save_tx_status_and_details(self, earning_pk, chain='std'):
+    """
+    :param self: Self
+    :param txid: transaction id
+    :param network: the network to pass to web3
+    :param created_on: time used to detect if the tx was dropped
+    :param chain: chain to pass to web3
+    :return: None
+    """
+    earning = Earning.objects.filter(pk=earning_pk).first()
+    txid = earning.txid
+    network = earning.network
+    created_on = earning.created_on
+    status, timestamp, tx = get_tx_status_and_details(txid, network, created_on, chain)
+    if status not in ['unknown', 'pending']:
+        tx = tx if tx else {}
+        TransactionHistory.objects.create(
+            earning=earning,
+            status=status,
+            payload=json.loads(json.dumps(dict(tx), cls=EncodeAnything)),
+            network=network,
+            txid=txid,
+            captured_at=timezone.now(),
+        )

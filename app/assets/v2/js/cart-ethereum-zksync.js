@@ -170,7 +170,7 @@ Vue.component('grantsCartEthereumZksync', {
 
       // Emit event so cart.js can update state accordingly to display info to user
       this.$emit('zksync-data-updated', {
-        zkSyncUnsupportedTokens: this.cart.unsupportedTokens,
+        zkSyncSupportedTokens: this.supportedTokens,
         zkSyncEstimatedGasCost: estimatedGasCost
       });
     },
@@ -179,7 +179,8 @@ Vue.component('grantsCartEthereumZksync', {
     insufficientBalanceAlert() {
       this.zksync.showModal = false; // hide checkout modal if visible
       this.resetZkSyncModal(); // reset modal settings
-      this.handleError(new Error('Insufficient balance to complete checkout')); // throw error and show to user
+
+      this.handleError(new Error('There is an insufficient balance to complete checkout. Please load funds and try again.')); // throw error and show to user
     },
 
     // Reset zkSync modal status after a checkout failure
@@ -215,6 +216,26 @@ Vue.component('grantsCartEthereumZksync', {
           throw new Error('Please connect a wallet');
         }
 
+        let networkId = String(Number(web3.eth.currentProvider.chainId));
+
+        if (networkId !== '1' && networkId !== '4') {
+          // User MetaMask must be connected to Ethereum mainnet
+          try {
+            await ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x1' }]
+            });
+          } catch (switchError) {
+            if (switchError.code === 4001) {
+              throw new Error('Please connect MetaMask to Ethereum network.');
+            } else if (switchError.code === -32002) {
+              throw new Error('Please respond to a pending MetaMask request.');
+            } else {
+              console.error(switchError);
+            }
+          }
+        }
+
         // Make sure setup is completed properly
         const isCorrectNetwork = this.zksync.checkoutManager && this.zksync.checkoutManager.network === this.network;
 
@@ -246,17 +267,17 @@ Vue.component('grantsCartEthereumZksync', {
       } catch (e) {
         switch (e) {
           case 'User closed zkSync':
-            _alert('Checkout not complete: User closed the zkSync page. Please try again', 'danger');
+            _alert('Looks like the window has been closed. To complete zkSync checkout, please try again.', 'danger');
             this.resetZkSyncModal();
             throw e;
 
           case 'Failed to open zkSync page':
-            _alert('Checkout not complete: Unable to open the zkSync page. Please try again', 'danger');
+            _alert('Opening the window took longer than expected. Checkout is not complete: Unable to open the zkSync page. Please try again', 'danger');
             this.resetZkSyncModal();
             throw e;
 
           case 'Took too long for the zkSync page to open':
-            _alert('Checkout not complete: Took too long to open the zkSync page. Please try again', 'danger');
+            _alert('The browser failed to open zkSync. Checkout is not complete. Please try again', 'danger');
             this.resetZkSyncModal();
             throw e;
 

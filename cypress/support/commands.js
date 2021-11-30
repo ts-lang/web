@@ -50,6 +50,11 @@ Cypress.Commands.add('impersonateUser', () => {
   cy.visit('impersonate/4/');
 });
 
+Cypress.Commands.add('impersonateStaffUser', () => {
+  cy.loginRootUser();
+  cy.visit('impersonate/1/');
+});
+
 Cypress.Commands.add('logout', () => {
   cy.request('logout/?next=/');
 });
@@ -99,6 +104,8 @@ Cypress.Commands.add('approveGrant', (grantSlug) => {
 
   cy.visit(changePath);
   cy.get('[name=active]').check();
+  cy.get('[name=visible]').check();
+  cy.get('[name=hidden]').uncheck();
   cy.get('[name=_save]').click();
 
   cy.logout();
