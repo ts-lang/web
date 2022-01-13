@@ -253,8 +253,8 @@
     } else {
       localStorage['keywords'] = value;
     }
-    $('.filter-tags').append('<a class="filter-tag keywords"><span>' + scrub(value) + '</span>' +
-      '<i class="fas fa-times" onclick="removeFilter(\'keywords\', \'' + scrub(value) + '\')"></i></a>');
+    $(`.filter-tags`).append(`<a class="filter-tag keywords"><span> ${scrub(value)} </span>
+      <i class="fas fa-times" onclick="removeFilter(\'keywords\', \'' + scrub(value) + '\')"></i></a>`);
   };
 
   var addTechStackOrgFilters = function(value) {

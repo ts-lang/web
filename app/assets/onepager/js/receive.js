@@ -107,7 +107,7 @@ $(document).ready(function() {
         _alert(err.message.split('\n')[0], 'danger');
       } else {
         const url = window.location.href.split('?')[0];
-        const csrfmiddlewaretoken = $('[name=csrfmiddlewaretoken]').val();
+        const csrfmiddlewaretoken = $(`[name=csrfmiddlewaretoken]`).val();
         const forwardingAddress = $('#forwarding_address').val();
         const saveAddr = ($('#save_addr').is(':checked') ? '1' : '0');
         const form = $(`
