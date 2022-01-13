@@ -884,7 +884,7 @@ $(document).ready(function() {
         </div>
       `;
 
-      $target.append(post_comment_html);
+      $.find(target).append(post_comment_html);
       if (success_callback && typeof success_callback != 'undefined') {
         success_callback($target);
       }

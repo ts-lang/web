@@ -267,7 +267,7 @@ var add_row = function() {
     </tr>
   `;
 
-  $('#payout_table tbody').append(html);
+  $.find('#payout_table tbody').append(html);
   userSearch('.username-search:last', true);
   $('body .username-search').each(function() {
     $(this).on('select2:select', event => {
