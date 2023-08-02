@@ -35,15 +35,13 @@ from django.views.decorators.http import require_http_methods
 
 from app.utils import get_profiles_from_text
 from cacheops import cached_view
-from dashboard.models import (
-    Activity, ActivityIndex, HackathonEvent, Profile, Tip, get_my_earnings_counter_profiles, get_my_grants,
-)
+from dashboard.models import Activity, HackathonEvent, Profile, Tip
 from dashboard.notifications import amount_usdt_open_work, open_bounties
 from dashboard.tasks import grant_update_email_task
 from economy.models import Token
 from marketing.mails import mention_email, new_funding_limit_increase_request, new_token_request, wall_post_email
-from marketing.models import EmailInventory
-from perftools.models import JSONStore
+from marketing.models import EmailInventory, ImageDropZone
+from perftools.models import JSONStore, StaticJsonEnv
 from ratelimit.decorators import ratelimit
 from retail.helpers import get_ip
 from townsquare.tasks import increment_view_counts
@@ -69,6 +67,7 @@ def get_activities(tech_stack=None, num_activities=15):
     return activities
 
 def index(request):
+
     context = {
         'title': 'Build and Fund the Open Web Together',
         'card_title': 'Gitcoin - Build and Fund the Open Web Together',
@@ -93,6 +92,44 @@ def index(request):
             'bounties_gmv': '3.43m'
         }
     context.update(data_results)
+
+    try:
+        landingBanner = StaticJsonEnv.objects.get(key='landingBanner').data
+        slides = landingBanner['slides']
+
+        for index, slide in enumerate(slides):
+            slides[index]['img'] = ImageDropZone.objects.get(pk=slide['img']).image.url
+            if slide['backgroundImage']:
+                slides[index]['backgroundImage'] = ImageDropZone.objects.get(pk=slide['backgroundImage']).image.url
+
+
+        if len(slides) == 0:
+            landingBanner = {
+                'default': True,
+                'slides': [
+                    {
+                        'img': static('v2/images/home/Flying_ppl_optimized.svg'),
+                        'title': 'Build and Fund the Open Web Together',
+                        'subtitle': 'Connect with the community developing digital public goods, creating financial freedom, and defining the future of the open web.',
+                    }
+                ]
+            }
+
+        landingBanner['slides'] = slides
+
+    except:
+        landingBanner = {
+            'default': True,
+            'slides': [
+                {
+                    'img': static('v2/images/home/Flying_ppl_optimized.svg'),
+                    'title': 'Build and Fund the Open Web Together',
+                    'subtitle': 'Connect with the community developing digital public goods, creating financial freedom, and defining the future of the open web.',
+                }
+            ]
+        }
+
+    context.update({'landingBanner': landingBanner})
 
     return TemplateResponse(request, 'home/index2021.html', context)
 
@@ -414,7 +451,7 @@ def contributor_bounties(request, tech_stack):
     }
 
     if tech_stack == 'new':
-        return redirect('new_funding_short')
+        return redirect('new_bounty')
 
     try:
         store = JSONStore.objects.filter(view='contributor_landing_page', key=tech_stack).first()
@@ -473,6 +510,8 @@ def robotstxt(request):
 
 
 def about(request):
+    # redirect to new site
+    return redirect('https://gitcoin.co/about')
 
     data_about = JSONStore.objects.get(view='about', key='general').data
 
@@ -731,6 +770,9 @@ def not_a_token(request):
     return redirect('/')
 
 
+def results2023(request, keyword=None):
+    return TemplateResponse(request, 'results-2023.html')
+
 def results(request, keyword=None):
     """Render the Results response."""
     if keyword and keyword not in programming_languages:
@@ -742,7 +784,7 @@ def results(request, keyword=None):
     context['prefix'] = 'data-'
     import json
     context['avatar_url'] = static('v2/images/results_preview.gif')
-    return TemplateResponse(request, 'results.html', context)
+    return TemplateResponse(request, 'results.html')
 
 def get_specific_activities(what, trending_only, user, after_pk, request=None, page=1, page_size=10):
 
@@ -1153,10 +1195,11 @@ def presskit(request):
 def handler403(request, exception=None):
     return error(request, 403)
 
+def csrf_failure(request, reason=""):
+    return error(request, 403)
 
 def handler404(request, exception=None):
     return error(request, 404)
-
 
 def handler500(request, exception=None):
     return error(request, 500)
@@ -1285,7 +1328,7 @@ def reddit(request):
     return redirect('https://www.reddit.com/r/gitcoincommunity/')
 
 def blog(request):
-    return redirect('https://gitcoin.co/blog')
+    return redirect('https://gitcoin.co/blog?utm_source=bounties.gitcoin.co')
 
 def calendar(request):
     return redirect('https://calendar.google.com/calendar/embed?src=7rq7ga2oubv3tk93hk67agdv88%40group.calendar.google.com')

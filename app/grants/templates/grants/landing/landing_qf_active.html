@@ -1,64 +1,59 @@
 {% load humanize static i18n tz %}
 <div class="container bg-white">
 
-  <!-- Trust banner -->
-  <div v-if="{{trust_bonus}} && {{trust_bonus}} < 150" v-cloak class="alert alert-primary spacer-mt-4 border-1 border-primary">
-    <i :class="'far font-weight-bold mr-4 mt-1 position-absolute cursor-pointer' + (!bannerCollapsed ? ' fa-minus' : ' fa-plus')" @click="toggleBannerCollapse" style="right: 0px; z-index: 1;"></i>
-    <div class="row">
-      <div :class="(!bannerCollapsed ? 'col-12 col-md-auto text-center pb-3' : 'col-auto text-center my-auto my-md-0')" style="max-width: 90px;">
-        <object type="image/svg+xml" data="{% static 'v2/images/trust/64x64-green.svg' %}" height="65" :height="(!bannerCollapsed ? '65' : '35')"></object>
-      </div>
-      <div :class="(!bannerCollapsed ? 'col-12 col-md-8 col-lg-7 col-xl-9 mt-1' : 'col-8 col-lg-7 col-xl-9 mt-1')">
-        <h6 class="gc-font-base mt-1">Maximize Your Impact! Your current match is {{ trust_bonus }}%</h6>
-        <span v-if="!bannerCollapsed" class="font-smaller-1 line-height-2">Verified users have up to 150% of their donation amount count towards the match fund algorithm. Unverified users — only 50%. Maximize your match by verifying with identity partners.</span>
-        <div v-if="!bannerCollapsed" class="row spacer-mt-2 font-smaller-1 line-height-2">
-          {% if round_active %}
-            <div class="col-12 col-lg-6 spacer-mt-2">
-              {% timezone "US/Mountain" %}
-                <a><i class="far fa-calendar-alt spacer-pr-2 text-primary"></i> Verify during {{ round_start_date|localtime|date:"F j" }} - {{ round_end_date|localtime|date:"F j" }}</a>
-              {% endtimezone %}
+  <!--  Header section -->
+  {% if has_active_rounds and profile_url %}
+  <div class="row">
+    <div v-if="{{trust_bonus}} < 150" class="alert alert-primary spacer-mt-4 border-1 border-primary">
+      <div class="row">
+        <div class="col-12 col-lg-auto text-left pb-1 pb-lg-0" style="max-width: 50px;">
+          <object type="image/svg+xml" data="{% static 'v2/images/trust/64x64-green.svg' %}" height="35"></object>
+        </div>
+        <div class="col-12 col-lg-11 mt-2">
+          <h6 class="gc-font-base mt-1 d-block d-md-inline">Maximize Your Impact! Your current match is {{ trust_bonus }}%</h6><br />
+          <div class="row">
+            <span class="font-smaller-1 line-height-2 col-12 col-lg-10">Verified users have up to 150% of their donation amount count towards the match fund algorithm. Unverified users — only 50%. Maximize your match by verifying with identity partners.</span>
+            <div class="col-12 col-lg-2">
+              <a class="btn btn-lg btn-primary d-block" href="{{profile_url}}/trust">{% trans 'Verify' %}</a>
             </div>
-          {% endif %}
-          <div class="col-12 col-lg-6 spacer-mt-2">
-            <span @click="showModal('why-this-matters-modal')" class="cursor-pointer hover-underline"><i class="fas fa-play-circle spacer-pr-2 text-primary"></i> Why this matters</span>
+          </div>
+          <div>
+            <svg class="mb-1" width="18" height="21" viewBox="0 0 18 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.94643 11.869H4.33929C4.07411 11.869 3.85714 11.6581 3.85714 11.4003V9.83777C3.85714 9.57996 4.07411 9.36902 4.33929 9.36902H5.94643C6.21161 9.36902 6.42857 9.57996 6.42857 9.83777V11.4003C6.42857 11.6581 6.21161 11.869 5.94643 11.869ZM10.2857 11.4003V9.83777C10.2857 9.57996 10.0687 9.36902 9.80357 9.36902H8.19643C7.93125 9.36902 7.71429 9.57996 7.71429 9.83777V11.4003C7.71429 11.6581 7.93125 11.869 8.19643 11.869H9.80357C10.0687 11.869 10.2857 11.6581 10.2857 11.4003ZM14.1429 11.4003V9.83777C14.1429 9.57996 13.9259 9.36902 13.6607 9.36902H12.0536C11.7884 9.36902 11.5714 9.57996 11.5714 9.83777V11.4003C11.5714 11.6581 11.7884 11.869 12.0536 11.869H13.6607C13.9259 11.869 14.1429 11.6581 14.1429 11.4003ZM10.2857 15.1503V13.5878C10.2857 13.33 10.0687 13.119 9.80357 13.119H8.19643C7.93125 13.119 7.71429 13.33 7.71429 13.5878V15.1503C7.71429 15.4081 7.93125 15.619 8.19643 15.619H9.80357C10.0687 15.619 10.2857 15.4081 10.2857 15.1503ZM6.42857 15.1503V13.5878C6.42857 13.33 6.21161 13.119 5.94643 13.119H4.33929C4.07411 13.119 3.85714 13.33 3.85714 13.5878V15.1503C3.85714 15.4081 4.07411 15.619 4.33929 15.619H5.94643C6.21161 15.619 6.42857 15.4081 6.42857 15.1503ZM14.1429 15.1503V13.5878C14.1429 13.33 13.9259 13.119 13.6607 13.119H12.0536C11.7884 13.119 11.5714 13.33 11.5714 13.5878V15.1503C11.5714 15.4081 11.7884 15.619 12.0536 15.619H13.6607C13.9259 15.619 14.1429 15.4081 14.1429 15.1503ZM18 4.99402V18.744C18 19.7792 17.1362 20.619 16.0714 20.619H1.92857C0.863839 20.619 0 19.7792 0 18.744V4.99402C0 3.95886 0.863839 3.11902 1.92857 3.11902H3.85714V1.08777C3.85714 0.829956 4.07411 0.619019 4.33929 0.619019H5.94643C6.21161 0.619019 6.42857 0.829956 6.42857 1.08777V3.11902H11.5714V1.08777C11.5714 0.829956 11.7884 0.619019 12.0536 0.619019H13.6607C13.9259 0.619019 14.1429 0.829956 14.1429 1.08777V3.11902H16.0714C17.1362 3.11902 18 3.95886 18 4.99402ZM16.0714 18.5096V6.86902H1.92857V18.5096C1.92857 18.6385 2.03705 18.744 2.16964 18.744H15.8304C15.9629 18.744 16.0714 18.6385 16.0714 18.5096Z" fill="#6F3FF5"/>
+            </svg>
+            Make sure to submit your Passport during the round.
           </div>
         </div>
       </div>
-      <div v-if="!bannerCollapsed" class="col-md-12 col-lg-3 col-xl-2 mt-4 m-lg-auto">
-        <a href="/profile/trust" class="btn btn-primary px-5 py-2 w-100 w-lg-auto">Verify</a>
-      </div>
     </div>
   </div>
-
-  <!--  Header section -->
-  <div class="row justify-content-between align-items-center my-5">
+  {% endif %}
+  <!-- <div class="row justify-content-between align-items-center my-5">
     <div class="col-md">
-      <h1 class="mb-3">
-        Discover and Fund <br>Extraordinary Public Goods
+      <h1 class="mb-md-3 mt-md-0 mb-2 mt-4">
+        Discover and Fund <br> Public Goods
       </h1>
-      <h4 class="text-wrap gc-font-base font-weight-normal mb-5 text-grey-400">
-        Gitcoin Grants sustain web3 projects with
+      <h4 class="text-wrap gc-font-base font-weight-normal mb-md-5 mb-4 pt-md-4 pt-1 text-grey-400">
+        Gitcoin Grants sustains projects with
         <span class="text-nowrap">
           <a rel="noopener noreferrer" href="https://wtfisqf.com/?grant=&grant=&grant=&grant=&match=1000" target="_blank">Quadratic Funding</a>
         </span>
       </h3>
       <div class="my-3">
         <a class="btn btn-lg btn-primary d-block d-sm-inline" href="{% url 'grants:grants_explorer' %}">{% trans 'View All Grants' %}</a>
-        <a class="btn btn-lg btn-outline-primary ml-sm-3 d-block d-sm-inline mt-2 mt-sm-0" href="/grants/new">{% trans 'Create a Grant' %}</a>
       </div>
-      <p>
-        <a href="{% url 'grants:new_matching_partner' %}">{% trans "Join the funder's league" %}</a>,
-        <!-- <a href="{% url 'grants:hall_of_fame' %}">{% trans "see the hall of fame" %}</a> -->
+      <p class="font-subheader mt-4 mb-2">
+        <a target="_blank" href="https://gitcoin.notion.site/gitcoin/Gitcoin-Grantee-Onboarding-Document-bbfe106a32534fb5a011f09c121257c3">
+          {% trans "Grantee Onboarding Support" %}
+        </a>
+      </p>
+      <p class="font-subheader mt-0">
+        <a target="_blank" href="https://gitcoin.notion.site/GR15-Gitcoin-Grant-Eligibility-Briefs-7949392eb2684ea6ae9072cad7fff277">
+          {% trans "Grant Eligibility Criteria" %}
+        </a>
       </p>
     </div>
-    <div class="col-md">
-      {% if show_main_round_banner %}
-        <img src="{% static 'v2/images/grants/gr13-banner-half.jpeg' %}" class="d-block w-100"/>
-      {% else %}
-        <img src="{% static 'v2/images/grants/rocket.svg' %}" height="241" width="311" />
-      {% endif %}
-    </div>
-  </div>
+  </div> -->
 
 
   <!-- This div is where the hero image goes-->
@@ -84,70 +79,6 @@
           </div>
         </div>
         {% endcomment %}
-
-        {% if show_round_banner %}
-
-          {% if round_status == 'active' %}
-            <!-- ACTIVE ROUND  -->
-            <div class="d-flex justify-content-between flex-wrap countdown-color h5">
-                <countdown :startdate="{{round_start_date|date:'U' }}*1000" :enddate="{{round_end_date|date:'U' }}*1000" class="countdown gc-font-heading mb-2">
-                  <template v-slot="slotProps">
-                    {{ banner_round_name }} - Active - Ends in
-                    <span>[[slotProps.time.days]]d</span>
-                    <span>[[slotProps.time.hours]]h</span>
-                    <span>[[slotProps.time.minutes]]m</span>
-                    <span>[[slotProps.time.seconds]]s</span>
-                  </template>
-                </countdown>
-                <div>
-                  {% timezone "US/Mountain" %}
-                    {{ round_start_date|localtime|date:"F j (gA e)" }} -  {{ round_end_date|localtime|date:"F j (gA e)" }}
-                  {% endtimezone %}
-                </div>
-            </div>
-
-          {% elif round_status == 'claim' %}
-            <!-- CLAIM -->
-            <div class="d-flex justify-content-between  flex-wrap countdown-color h5">
-              <countdown :startdate="{{claim_start_date|date:'U' }}*1000" :enddate="{{claim_end_date|date:'U' }}*1000" class="countdown gc-font-heading mb-2">
-                <template v-slot="slotProps">
-                  {{ banner_round_name }} - Claim - Active - Ends in
-
-                  <span>[[slotProps.time.days]]d</span>
-                  <span>[[slotProps.time.hours]]h</span>
-                  <span>[[slotProps.time.minutes]]m</span>
-                  <span>[[slotProps.time.seconds]]s</span>
-                </template>
-              </countdown>
-              <div>
-                {% timezone "US/Mountain" %}
-                  {{ claim_start_date|localtime|date:"F j (gA e)" }} -  {{ claim_end_date|localtime|date:"F j (gA e)" }}
-                {% endtimezone %}
-              </div>
-            </div>
-          {% elif round_status == 'upcoming' %}
-            <!-- UPCOMING -->
-            <div class="d-flex justify-content-between  flex-wrap countdown-color h5">
-              {{ banner_round_name }} - Proposed Dates
-              <div>
-                {% timezone "US/Mountain" %}
-                  {{ round_start_date|localtime|date:"F j (gA e)" }} -  {{ round_end_date|localtime|date:"F j (gA e)" }}
-                {% endtimezone %}
-              </div>
-            </div>
-          {% elif round_status == 'done' %}
-            <!-- ROUND END -->
-            <div class="d-flex justify-content-between flex-wrap countdown-color h5">
-              {{ banner_round_name }} - Ended
-              <div>
-                {% timezone "US/Mountain" %}
-                  {{ round_start_date|localtime|date:"F j (gA e)" }} -  {{ round_end_date|localtime|date:"F j (gA e)" }}
-                {% endtimezone %}
-              </div>
-            </div>
-          {% endif %}
-
-        {% endif %}
 
       </div>
     </div>

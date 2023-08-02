@@ -1,265 +1,176 @@
-{% load i18n static humanize %}
+{% load i18n bundle static humanize %}
 
 {% if not profile.is_org and is_my_profile %}
 
-<!-- Passport Modal -->
-<div class="modal fade" id="passportModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">Generate your Proof of Personhood Passport</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        <img class="float-left p-2" src="/static/v2/images/passport-cover.png" style="max-width:200px;">
-        <div class="subbody">
-          <strong>What:</strong> PoPP aggregates the top personhood-identity providers in the web3 space into one transportable identity that proves your personhood.
-          <hr>
-          <strong>How:</strong> You can generate your Proof of Personhood Passport via the following methods.
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" id="gen_passport" class="btn btn-primary">NFT</button>
-        <button type="button" class="btn btn-secondary disabled">3Box (coming soon)</button>
-        <button type="button" class="btn btn-secondary disabled">SpruceID (coming soon)</button>
-      </div>
-    </div>
-  </div>
-</div>
-
   <div id="gc-trust-manager-app" v-cloak>
+
     <active-trust-manager inline-template>
       <div>
 
+        <trust-bonus-passport v-model="passportDetailsShow"
+          :stamp-verifications="stampVerifications"
+          :is-unlink-pending="isUnlinkPending"
+          :did="passportDid"
+          :unlink-error-msg="unlinkErrorMsg"
+          :unlink-success-msg="unlinkSuccessMsg"
+          @unlink="() => showConfirmUnlinkPassport()">
+        </trust-bonus-passport>
+
+        <b-modal v-model="confirmUnlinkPassportShow" @ok="() => confirmUnlinkPassport()" cancel-variant="light" hide-header>
+          <div class="d-flex">
+            <div class="pr-2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 9.00001V11M12 15H12.01M20.6179 5.98434C20.4132 5.99472 20.2072 5.99997 20 5.99997C16.9265 5.99997 14.123 4.84453 11.9999 2.94434C9.87691 4.84446 7.07339 5.99985 4 5.99985C3.79277 5.99985 3.58678 5.9946 3.38213 5.98422C3.1327 6.94783 3 7.95842 3 9.00001C3 14.5915 6.82432 19.2898 12 20.622C17.1757 19.2898 21 14.5915 21 9.00001C21 7.95847 20.8673 6.94791 20.6179 5.98434Z" stroke="#664AEC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <h4>Unlink Passport</h4>
+              <p class="my-2 text-muted">Are you sure you want to unlink this Passport?</p>
+             </div>
+          </div>
+        </b-modal>
+
+        <b-modal v-model="noPassportShow" cancel-variant="light" hide-header>
+          <div class="d-flex">
+            <div class="pr-2">
+              <div class="p-2 border rounded-circle">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 9.00001V11M12 15H12.01M20.6179 5.98434C20.4132 5.99472 20.2072 5.99997 20 5.99997C16.9265 5.99997 14.123 4.84453 11.9999 2.94434C9.87691 4.84446 7.07339 5.99985 4 5.99985C3.79277 5.99985 3.58678 5.9946 3.38213 5.98422C3.1327 6.94783 3 7.95842 3 9.00001C3 14.5915 6.82432 19.2898 12 20.622C17.1757 19.2898 21 14.5915 21 9.00001C21 7.95847 20.8673 6.94791 20.6179 5.98434Z" stroke="#664AEC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+            <div>
+              <p class="font-bold">No Passport Found</p>
+              <p class="my-2 text-muted">Make sure you select an account that is associated with a Gitcoin Passport or create a new one.</p>
+             </div>
+          </div>
+          <template v-slot:modal-footer>
+            <b-button variant="outline" class="btn btn-lg btn-outline-gc-grey" @click="noPassportShow = false">Cancel</b-button>
+            <b-button variant="primary" class="col-12 col-md-auto btn btn-lg flex-shrink-0 btn-primary" @click.prevent="lintToPassport();">Create Passport</b-button>
+          </template>
+        </b-modal>
+
+        <b-modal v-model="myStampsShow" hide-header hide-footer>
+          <div class="d-flex justify-content-center">
+            <div class="pr-2">
+              <div class="p-2 border rounded-circle">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M1.58579 1.58579C1.21071 1.96086 1 2.46957 1 3V5C1 5.53043 1.21071 6.03914 1.58579 6.41421C1.96086 6.78929 2.46957 7 3 7H5C5.53043 7 6.03914 6.78929 6.41421 6.41421C6.78929 6.03914 7 5.53043 7 5V3C7 2.46957 6.78929 1.96086 6.41421 1.58579C6.03914 1.21071 5.53043 1 5 1H3C2.46957 1 1.96086 1.21071 1.58579 1.58579Z" stroke="#664AEC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M11.5858 1.58579C11.2107 1.96086 11 2.46957 11 3V5C11 5.53043 11.2107 6.03914 11.5858 6.41421C11.9609 6.78929 12.4696 7 13 7H15C15.5304 7 16.0391 6.78929 16.4142 6.41421C16.7893 6.03914 17 5.53043 17 5V3C17 2.46957 16.7893 1.96086 16.4142 1.58579C16.0391 1.21071 15.5304 1 15 1H13C12.4696 1 11.9609 1.21071 11.5858 1.58579Z" stroke="#664AEC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M1.58579 11.5858C1.21071 11.9609 1 12.4696 1 13V15C1 15.5304 1.21071 16.0391 1.58579 16.4142C1.96086 16.7893 2.46957 17 3 17H5C5.53043 17 6.03914 16.7893 6.41421 16.4142C6.78929 16.0391 7 15.5304 7 15V13C7 12.4696 6.78929 11.9609 6.41421 11.5858C6.03914 11.2107 5.53043 11 5 11H3C2.46957 11 1.96086 11.2107 1.58579 11.5858Z" stroke="#664AEC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M11.5858 11.5858C11.2107 11.9609 11 12.4696 11 13V15C11 15.5304 11.2107 16.0391 11.5858 16.4142C11.9609 16.7893 12.4696 17 13 17H15C15.5304 17 16.0391 16.7893 16.4142 16.4142C16.7893 16.0391 17 15.5304 17 15V13C17 12.4696 16.7893 11.9609 16.4142 11.5858C16.0391 11.2107 15.5304 11 15 11H13C12.4696 11 11.9609 11.2107 11.5858 11.5858Z" stroke="#664AEC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="d-flex flex-column justify-content-center text-center">
+            <p class="font-weight-bold m-2">Passport Details</p>
+            <p class="text-grey-400 m-2">This is an overview of the Stamps/Data associated with your Gitcoin Passport.</p>
+          </div>
+          <div class="d-flex flex-column ">
+            <p class="text-grey-400">Stamps</p>
+            <hr class="m-0">
+            <div v-for="stamp in passportStamps">
+              <div class="d-flex justify-content-between providers">
+                <div class="d-flex">
+                  <img v-if="stamp === 'Github'" src="{% static "v2/images/stamps/GithubStampIcon.svg" %}" height="60">
+                  <img v-if="stamp === 'Facebook'" src="{% static "v2/images/stamps/FacebookStampIcon.svg" %}" height="60">
+                  <img v-if="stamp === 'Google'" src="{% static "v2/images/stamps/GoogleStampIcon.svg" %}" height="60">
+                  <img v-if="stamp === 'Twitter'" src="{% static "v2/images/stamps/TwitterStampIcon.svg" %}" height="60">
+                  <img v-if="stamp === 'Ens'" src="{% static "v2/images/stamps/EnsStampIcon.svg" %}" height="60">
+                  <img v-if="stamp === 'Poh'" src="{% static "v2/images/stamps/PohStampIcon.svg" %}" height="60">
+                  <img v-if="stamp === 'Brightid'" src="{% static "v2/images/stamps/BrightidStampIcon.svg" %}" height="60">
+                  <p class="font-weight-bold">[[stamp]]</p>
+                </div>
+                <p style="color: #059669">Verified</p>
+              </div>
+              <hr class="m-0">
+            </div>
+          </div>
+          <b-button variant="primary" class="mt-2 col-12 btn btn-lg btn-primary" @click.prevent="myStampsShow = false">Done</b-button>
+        </b-modal>
+
+        <b-modal v-model="passportScoringShow" hide-header hide-footer>
+          <div class="mt-1">
+            <h4>Processing...</h4>
+            <p class="my-2 text-muted">Please hold while we connect to your Gitcoin Passport.</p>
+          </div>
+          <div class="d-flex mb-3" style="height: 150px;">
+            <div class="d-flex flex-column justify-content-between align-items-center h-100 mr-2">
+              <div class="status" :class="{ complete: loadingStates.submitting.complete, loading: loadingStates.submitting.loading }">
+                <div v-if="loadingStates.submitting.loading"></div>
+                <i v-if="loadingStates.submitting.complete" class="fas fa-solid fa-check" style="color: white"></i>
+              </div>
+              <div class="vl" :class="{ complete: loadingStates.submitting.complete }"></div>
+              <div class="status" :class="{ complete: loadingStates.scoring.complete, loading: loadingStates.scoring.loading }">
+                <div v-if="loadingStates.scoring.loading"></div>
+                <i v-if="loadingStates.scoring.complete" class="fas fa-solid fa-check" style="color: white"></i>
+              </div>
+              <div class="vl" :class="{ complete: loadingStates.scoring.complete }"></div>
+              <div class="status" :class="{ complete: loadingStates.saving.complete, loading: loadingStates.saving.loading }">
+                <div v-if="loadingStates.saving.loading"></div>
+                <i v-if="loadingStates.saving.complete" class="fas fa-solid fa-check" style="color: white"></i>
+              </div>
+            </div>
+            <div class="d-flex flex-column statuses h-100">
+              <div class="d-flex">
+                <div>
+                  <p class="font-weight-bold mb-0">Submitting</p>
+                  <p>The metadata is being saved in a safe place.</p>
+                </div>
+              </div>
+              <div class="d-flex">
+                <div>
+                  <p class="font-weight-bold mb-0">Scoring</p>
+                  <p>Connecting to the Mainnet blockchain.</p>
+                </div>
+              </div>
+              <div class="d-flex">
+                <div>
+                  <p class="font-weight-bold mb-0">Saving</p>
+                  <p>Just another moment while we finish things up...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </b-modal>
+
         <why-this-matters-modal
-          :show-modal="visibleModal === 'why-this-matters-modal'"
+          :show-modal="modalShow && modalName === 'why-this-matters-modal'"
           @modal-dismissed="hideModal()">
         </why-this-matters-modal>
 
-        <brightid-verify-modal
-          :service="serviceDict.brightid"
-          :show-validation="visibleModal === 'brightid-modal'"
-          :brightid-uuid="serviceDict.brightid.uuid"
-          :validation-step="(serviceDict.brightid._status === 'not_connected' || serviceDict.brightid._status === 'unknown' ?
-            'connect-brightid' : (serviceDict.brightid._status !== 'verified' ?
-              'verify-brightid' : 'disconnect'
-            )
-          )"
+        <!-- <state-modal
+          :show-modal="modalShow" :type="modalName"
           @modal-dismissed="hideModal()">
-        </brightid-verify-modal>
-
-        <idena-verify-modal
-          :service="serviceDict.idena"
-          :show-validation="visibleModal === 'idena-modal'"
-          :validation-step="(serviceDict.idena.is_verified ?
-            'verified' : (serviceDict.idena.is_connected ?
-              'connected' : 'connect'
-            )
-          )"
-          @modal-dismissed="hideModal()">
-        </idena-verify-modal>
-
-        <sms-verify-modal
-          :service="serviceDict.sms"
-          :show-validation="visibleModal === 'sms-modal'"
-          :validation-step="(!serviceDict.sms.is_verified ? 'intro' : 'disconnect')"
-          @modal-dismissed="hideModal()">
-        </sms-verify-modal>
-
-        <twitter-verify-modal
-          :service="serviceDict.twitter"
-          :show-validation="visibleModal === 'twitter-modal'"
-          :validation-step="(!serviceDict.twitter.is_verified ? 'send-tweet' : 'disconnect')"
-          @modal-dismissed="hideModal()">
-        </twitter-verify-modal>
-
-        <poap-verify-modal
-          :service="serviceDict.poap"
-          :show-validation="visibleModal === 'poap-modal'"
-          :validation-step="(!serviceDict.poap.is_verified ? 'validate-address' : 'disconnect')"
-          :service="serviceDict.poap"
-          @modal-dismissed="hideModal()">
-        </poap-verify-modal>
-
-        <ens-verify-modal
-          :service="serviceDict.ens"
-          :show-validation="visibleModal === 'ens-modal'"
-          :validation-step="(!serviceDict.ens.is_verified ? 0 : 'disconnect')"
-          @modal-dismissed="hideModal()">
-        </ens-verify-modal>
-
-        <duniter-verify-modal
-          :show-validation="visibleModal === 'duniter-modal'"
-          @modal-dismissed="hideModal()">
-        </duniter-verify-modal>
-
-        <poh-verify-modal
-          :service="serviceDict.poh"
-          :show-validation="visibleModal === 'poh-modal'"
-          :validation-step="(!serviceDict.poh.is_verified ? 'validate-address' : 'disconnect')"
-          @modal-dismissed="hideModal()">
-        </poh-verify-modal>
-
-        <google-verify-modal
-          :service="serviceDict.google"
-          :show-validation="visibleModal === 'google-modal'"
-          :validation-step="(!serviceDict.google.is_verified ? 'connect' : 'disconnect')"
-          @modal-dismissed="hideModal()">
-        </google-verify-modal>
-
-        <facebook-verify-modal
-          :service="serviceDict.facebook"
-          :show-validation="visibleModal === 'facebook-modal'"
-          :validation-step="(!serviceDict.facebook.is_verified ? 'connect' : 'disconnect')"
-          @modal-dismissed="hideModal()">
-        </facebook-verify-modal>
-
-        {% if is_staff %}
-        <div class="row">
-          <div class="col-6 d-none d-lg-block col-xl-7"></div>
-          <div class="text-left position-relative col-12 col-lg-6 col-xl-5" style="padding: 5px; min-height: 115px;">
-            <img class="p-2 position-absolute left-0" src="/static/v2/images/passport-cover.png" style="max-width:100px; margin-top: -10px;">
-            <div style="padding-left: 100px;">
-              <strong class="pb-2 d-block">STAFF ONLY</strong> Take your TrustBonus with you across the web with <a href="https://proofofpersonhood.com/">your Proof of Personhood Passport</a>.
-            </div>
-            <div class="text-right pt-2">
-              <a data-toggle="modal" data-target="#passportModal" href="#" role="button" class="bottom-0 btn btn-primary">Try It!</a>
-            </div>
-          </div>
-        </div>
-        <hr>
-        {% endif %}
-
-        <div class="bg-violet-300 text-white spacer-p-4 spacer-mt-5">
-          <div class="row">
-            <div class="col-12 col-lg-9">
-              <h2>Increase Your Impact Up to 150%</h2>
-              <span class="font-smaller-1 line-height-2">On Gitcoin verified users have 100% (or more) of their donation amount count towards the match fund algorithm. Unverified users begin with 50%. To ensure sybil resistance and protect Quadratic Funding, please verify your account below.</span>
-              <div class="row spacer-mt-2 font-smaller-1 line-height-2">
-                {% if show_round_banner %}
-                  <div class="col-12 col-lg-6 spacer-mt-2">
-                    <a><i class="far fa-calendar-alt spacer-pr-2"></i> Verify during [[round_start_date]] - [[round_end_date]]</a>
-                  </div>
-                {% endif %}
-                <div class="col-12 col-lg-6 spacer-mt-2">
-                  <span @click="showModal('why-this-matters-modal')" class="cursor-pointer hover-underline"><i class="fas fa-play-circle spacer-pr-2"></i> Why this matters</span>
+        </state-modal> -->
+        <div>
+          <div>
+            <div class="d-flex flex-row p-2 mb-lg-4 mx-lg-5 trust-bonus-message">
+              <div class="d-flex flex-column p-3 p-md-2">
+                <div class="order-0 d-lg-none w-50 w-md-25 mb-2 align-self-start">
+                  <img src="{% static 'v2/images/trust/no-trust-man.svg' %}" alt="Pink robot" />
+                </div>
+                <div class="order-1">
+                  <h3 class="line-height-1">Goodbye Trust Bonus. Soon Grants Protocol Launch.</h3>
+                </div>
+                <div class="order-2">
+                  <p class="line-height-2 font-weight-light">You cannot create a Trust Bonus score for your Passport anymore. Trust Bonus is exclusively relevant to the legacy Grants app here, which we will not continue operating much longer. On the positive flip side, as you may know, we are in full swing, working toward launching a fully revamped version of Gitcoin Grants: the Gitcoin Grants Protocol. When we roll out the new Grants app, we'll widely communicate with you how to verify your identity in the new app. See ya in the Quadratic Lands!</p>
+                  <p>
+                      <span><i class="fas fa-exclamation-circle"></i></span><a class="text-dark-purple" href="https://gov.gitcoin.co/t/request-for-feedback-proposed-future-for-the-grant-programs-and-gr16-as-we-transition-to-the-protocol/11624/42" target="_blank"><u> Find out more here.</u></a>
+                  </p>
                 </div>
               </div>
-            </div>
-            <div class="col-12 col-lg-3 text-center text-lg-right">
-              <object class="spacer-mr-4 spacer-mt-3 spacer-mt-lg-0" type="image/svg+xml" data="{% static 'v2/images/trust/64x64.svg' %}" width="158" height="158"></object>
-            </div>
-          </div>
-        </div>
-
-        <div class="row spacer-mt-6 text-grey-500 font-smaller-1">
-          <div class="col-12 col-lg-8 spacer-pb-3">
-            <h3>Trust Verification</h3>
-           <span class="line-height-2">On Gitcoin verified users have 100% (or more) of their donation amount count towards the match fund algorithm. Unverified users begin with 50%. To ensure sybil resistance and protect Quadratic Funding, please verify your account below.</span>
-          </div>
-          <div class="col-12 col-lg-4 mt-2 m-lg-auto">
-            <div class="spacer-mb-2">Verification Level</div>
-            <div class="progress rounded-0" style="height: 0.4rem;">
-              <div class="progress-bar bg-secondary" role="progressbar" :style="{width: `${100/150 * trust_bonus}%`}" :aria-valuenow="`${100/150 * trust_bonus}%`" aria-valuemin="0" aria-valuemax="100"></div>
-            </div>
-            <div class="spacer-mt-2 font-weight-bold">You'll receive [[trust_bonus]]% of 150% Match</div>
-          </div>
-        </div>
-        <div class="row font-smaller-1" v-for="i in Math.ceil(services.length / 3)">
-          <div class="col-12 col-lg-4 spacer-mt-5" v-for="service in services.slice((i - 1) * 3, i * 3)">
-            <div class="card rounded-0 spacer-p-3" style="height: 100%; min-height:300px;">
-              <div class="row">
-                <div class="col-9">
-                  <span class="font-bigger-2 text-primary">[[service.name]]</span>
-                </div>
-                <div class="col-3 text-right">
-                  <img v-if="service.icon_path" width="41" height="40" :src="[[service.icon_path]]"/>
-                  <span v-else >
-                    <i :class="[[service.icon_class]]" v-bind:style="service.icon_style"></i>
-                  </span>
-                </div>
-              </div>
-              <div class="row spacer-mb-3">
-                <div class="col-12">
-                  <span class="text-grey-300">[[service.match_percent]]% match</span>
-                </div>
-              </div>
-              <div class="row mb-lg-4 my-auto my-lg-0">
-                <div class="col">
-                  <span class="text-grey-400 line-height-4 line-clamp-3">[[service.desc]]</span>
-                </div>
-              </div>
-              <div class="row mt-auto">
-                <div class="col-6 m-auto text-success" :class="(service.is_verified || service.status ? 'd-flex' : 'd-none d-lg-flex')">
-                  <span v-if="service.is_verified">
-                    <i class="far fa-check-circle"></i> <i>Verified</i>
-                  </span>
-                  <span v-if="service.status" style="color: orange;">
-                    <i class="fal fa-exclamation-circle"></i> <i>[[service.status]]</i>
-                  </span>
-                </div>
-                <div class="text-right" :class="(service.is_verified || service.status ? 'col-6' : 'col-12 col-lg-6')">
-                  <button v-if="!service.is_verified" class="btn btn-primary w-100 w-md-auto px-md-3" @click="showModal(service.ref + '-modal')">Verify</button>
-                  <div v-else>
-                    <button v-if="!service.alt_is_verified_btn" :disabled="service.disable_disconnect" class="btn btn-outline-primary" @click="showModal(service.ref + '-modal')">Disconnect</button>
-                    <a v-else :class="'btn ' + service.alt_is_verified_btn.type" :href="service.alt_is_verified_btn.location" target="_blank">[[service.alt_is_verified_btn.text]]</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row spacer-my-6">
-          <div class="col-auto">
-            <i class="far fa-life-ring text-primary" style="font-size: 46px"></i>
-          </div>
-          <div class="col">
-              <h3>Need help verifying identity?</h3>
-              <span>Please contact the services directly for any questions or support in getting your identity confirmed.</span>
-          </div>
-        </div>
-
-        <div class="accordion-group gc-accordion spacer-mb-7" style="margin-left: -27px;" id="accordion-group">
-          <h5 class="accordion collapsed" id="headingOne" data-parent="#accordion-group" data-toggle="collapse" data-target="#collapseOne" aria-controls="collapseOne">
-            <span class="accordion-title">
-              Coming Soon
-            </span>
-          </h5>
-          <div class="accordion-panel collapse font-subheader text-grey-400" id="collapseOne" aria-labelledby="headingOne" data-parent="#accordion-group">
-            <div class="container mt-4">
-              <p>
-                Verifying with these services doesn't provide a matching bonus yet, but will in future Grants rounds.
-              </p>
-              <!-- <active-trust-row-template icon-type="image" icon-path="/static/v2/images/project_logos/duniter_brand.png"
-                title="Verify with Duniter" :match-percent=0 :is-verified="'{{is_duniter_verified}}' === 'True'" button-text="Verify"
-                @verify-button-pressed="showModal('duniter-modal')">
-                <template v-slot:description>
-                  Verify your Duniter Account
-                </template>
-              </active-trust-row-template> -->
-              <div v-for="service in coming_soon">
-                <inactive-trust-row-template :service="service" :when="'Coming Soon'"></inactive-trust-row-template>
-              </div>
-            </div>
-
-            <div>
-              <div class="container mt-4">
-                <h5>Roadmap</h5>
-                <a class="py-2 d-block" href="https://twitter.com/owocki/status/1304422182043303937" target="_blank">To view our full roadmap click here</a>
-                <div v-for="service in roadmap">
-                  <inactive-trust-row-template :service="service" :when="'On the Roadmap'"></inactive-trust-row-template>
-                </div>
+              <div class="d-none d-lg-block align-self-center w-75 p-lg-3 pr-5">
+                <div>
+                  <img src="{% static 'v2/images/trust/no-trust-man.svg' %}" alt="Pink robot" />
+                </div>  
               </div>
             </div>
           </div>
         </div>
       </div>
-
     </active-trust-manager>
-
 
   </div>
 

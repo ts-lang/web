@@ -44,8 +44,12 @@ git add .
 git stash
 
 # If no $BRANCH is specified, it will use the current one
+echo "- checkout $BRANCH"
 git checkout "$BRANCH"
-git pull origin "$BRANCH"
+echo "- fetch"
+git fetch origin $BRANCH 
+echo "- reset to origin/$BRANCH"
+git reset --hard "origin/$BRANCH"
 
 # deploy hooks
 echo "- install req"
@@ -69,21 +73,21 @@ rm -f output/w*_*.pdf; rm -f assets/other/wp.pdf;
 echo "- collect static"
 if [ "$ISFRONTENDPUSH" ] && [ "$JOBS_NODE" ]; then
     yarn install --non-interactive --frozen-lockfile
-    python3 manage.py bundle
+    python3.7 manage.py bundle
     yarn run build
-    python3 manage.py collectstatic --noinput -i other
+    python3.7 manage.py collectstatic --noinput -i other
 fi
 
 rm -Rf ~/gitcoin/coin/app/static/other
 
 if [ "$MIGRATE_DB" ] && [ "$JOBS_NODE" ]; then
     echo "- db"
-    python3 manage.py migrate
+    python3.7 manage.py migrate
 fi
 
 if [ "$CREATE_CACHE_TABLE" ] && [ "$JOBS_NODE" ]; then
     echo "- creating cache table"
-    python3 manage.py createcachetable
+    python3.7 manage.py createcachetable
 fi
 
 

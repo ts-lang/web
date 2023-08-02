@@ -33,13 +33,15 @@ if (document.getElementById('grants-showcase')) {
     network: 'mainnet',
     state: 'active',
     profile: false,
-    sub_round_slug: false,
+    round_num: document.round_num ? document.round_num : 0,
+    customer_name: document.customer_name ? document.customer_name : false,
+    sub_round_slug: document.sub_round_slug ? document.sub_round_slug : false,
     collections_page: 1,
     grant_regions: [],
     grant_types: [],
     grant_tags: [],
     tenants: [],
-    idle: false,
+    idle: true,
     featured: true,
     round_type: false
   };
@@ -66,7 +68,8 @@ if (document.getElementById('grants-showcase')) {
     {'name': 'KUSAMA', 'label': 'Kusama'},
     {'name': 'BINANCE', 'label': 'Binance'},
     {'name': 'RSK', 'label': 'Rsk'},
-    {'name': 'ALGORAND', 'label': 'Algorand'}
+    {'name': 'ALGORAND', 'label': 'Algorand'},
+    {'name': 'COSMOS', 'label': 'Cosmos'}
   ];
 
   var appGrants = new Vue({
@@ -80,6 +83,7 @@ if (document.getElementById('grants-showcase')) {
       grantTenants: grantTenants,
       grant_tags: [],
       grant: {},
+      dismissFavoriteAlertCountDown: 0,
       collectionsPage: null,
       cart_data_count: CartData.length(),
       network: document.network,
@@ -100,7 +104,9 @@ if (document.getElementById('grants-showcase')) {
       view: localStorage.getItem('grants_view') || 'grid',
       shortView: true,
       bottom: false,
-      sub_round_slug: false,
+      round_num: document.round_num,
+      customer_name: document.customer_name,
+      sub_round_slug: document.sub_round_slug,
       cart_lock: false,
       collection_id: document.collection_id,
       collection_title: document.collection_title,
@@ -138,6 +144,7 @@ if (document.getElementById('grants-showcase')) {
         {label: 'Weighted Shuffle', value: 'weighted_shuffle'},
         {label: 'Trending', value: '-metadata__upcoming'},
         {label: 'Undiscovered Gems', value: '-metadata__gem'},
+        {label: 'GTC Conviction Voting', value: '-metadata__cv'},
         {label: 'Recently Updated', value: '-last_update'},
         {label: 'Newest', value: '-created_on'},
         {label: 'Oldest', value: 'created_on'},
@@ -360,6 +367,13 @@ if (document.getElementById('grants-showcase')) {
         }
 
         getGrants.grants.forEach(function(item) {
+
+          const amount_received = Number(item.amount_received.replace(',', ''));
+          const rounded_lifetime_amount = Math.round(amount_received / 1000) * 1000;
+
+          item.rounded_lifetime_amount = (rounded_lifetime_amount > 1000) ?
+            `~$${rounded_lifetime_amount.toLocaleString()}` : 'Less than $1,000';
+
           if (!vm.prevouslyLoadedGrants[item.id]) {
             vm.grants.push(item);
             vm.previouslyLoadedGrants[item.id] = item;
@@ -755,6 +769,7 @@ if (document.getElementById('grants-showcase')) {
           };
 
           currentCLR.formatted_dates = formatted_dates;
+          currentCLR.shareURL = window.location.origin + '/grants/clr/' + currentCLR.sub_round_slug;
         }
 
         return currentCLR;

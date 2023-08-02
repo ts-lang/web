@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.postgres.fields import JSONField
 from django.db import models
@@ -13,8 +15,27 @@ from townsquare.models import Comment
 from web3 import Web3
 
 
+class ContributionQuerySet(models.QuerySet):
+    """Define the Contribution default queryset and manager."""
+
+    def recent(self, days):
+        """Filter results down to recent contributions modified in the last days."""
+        return self.filter(modified_on__gt=timezone.now() - timedelta(days=days))
+
+    def layer2(self):
+        """Filter results down to zksync and polygon contributions."""
+        return self.filter(checkout_type__in=["eth_zksync", "eth_polygon"])
+
+
 class Contribution(SuperModel):
     """Define the structure of a subscription agreement."""
+
+    class Meta:
+        """Define the metadata for Contribution."""
+
+        index_together = [
+            ["modified_on", "checkout_type"]
+        ]
 
     CHECKOUT_TYPES = [
         ('eth_std', 'eth_std'),
@@ -27,7 +48,8 @@ class Contribution(SuperModel):
         ('harmony_std', 'harmony_std'),
         ('binance_std', 'binance_std'),
         ('rsk_std', 'rsk_std'),
-        ('algorand_std', 'algorand_std')
+        ('algorand_std', 'algorand_std'),
+        ('cosmos_std', 'cosmos_std')
     ]
 
     success = models.BooleanField(default=True, db_index=True, help_text=_('Whether or not success.'))
@@ -106,6 +128,8 @@ class Contribution(SuperModel):
     )
     anonymous = models.BooleanField(default=False, help_text=_('Whether users can view the profile for this project or not'))
 
+    objects = ContributionQuerySet.as_manager()
+
     @property
     def blockexplorer_url(self):
             return self.blockexplorer_url_helper(self.split_tx_id)
@@ -157,17 +181,13 @@ class Contribution(SuperModel):
             comment = f"Transaction status: {status} (as of {timezone.now().strftime('%Y-%m-%d %H:%m %Z')})"
             profile = Profile.objects.get(handle='gitcoinbot')
             activity = self.subscription.activities.first()
-            # delete all before recreating
-            Comment.objects.filter(
+            Comment.objects.update_or_create(
                 profile=profile,
                 activity=activity,
-            ).delete()
-            # create new entry
-            Comment.objects.create(
-                profile=profile,
-                activity=activity,
-                comment=comment,
-                is_edited=True
+                defaults={
+                    "comment": comment,
+                    "is_edited": True,
+                }
             )
         except Exception as e:
             print(e)

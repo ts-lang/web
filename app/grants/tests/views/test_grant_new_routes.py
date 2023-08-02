@@ -16,8 +16,8 @@ class TestNewGrantGetRoute:
         content = str(response.content)
 
         assert response.status_code == 200
-        assert 'Create a Grant' not in content
-        assert 'Please log in before submitting a grant' in content
+        assert 'Create new grant' not in content
+        assert 'This old centralized version is now retired' in content
 
     def test_when_logged_in_renders_grants_new_template(self, django_user_model):
         user = django_user_model.objects.create(username='gitcoin', password='password123')
@@ -28,7 +28,7 @@ class TestNewGrantGetRoute:
         response = client.get('/grants/new')
 
         assert response.status_code == 200
-        assert 'Create a Grant' in str(response.content)
+        assert 'This old centralized version is now retired' in str(response.content)
 
 
 @pytest.mark.django_db
@@ -236,6 +236,7 @@ class TestNewGrantsPostRoute:
             'admin_address': '0xB81C935D01e734b3D8bb233F5c4E1D72DBC30f6c',
             'team_members[]': '',
             'tags[]': '',
+            'tag_eligibility_reason': '',
         }
 
         client = Client(HTTP_USER_AGENT='chrome')

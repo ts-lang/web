@@ -34,7 +34,7 @@
       <link rel="stylesheet" type="text/x-scss" href={% static "v2/scss/gc-utilities.scss" %} />
     {% endbundle %}
     <link rel="prefetch" href="/grants/v1/api/grant/{{grant.id}}/" />
-
+    {% include '../analytics_manager.html' %}
   </head>
 
   <body class="interior {{ active }} grant g-font-muli">
@@ -137,7 +137,7 @@
           <grant-details :grant="grant" v-if="grant?.id">
             <img :src="grant.logo_url" alt="" height="290px" class="d-block w-100 mb-4" style="object-fit: contain; background: black;" :style="grant.image_css">
             <div class="container mb-3">
-              <a :href="backLink.url" class="font-body" rel="noopener noreferrer"><i class="fas fa-chevron-left mr-2"></i>Back to [[backLink.title]] </a>
+              <a href="/grants/explorer" class="font-body" rel="noopener noreferrer"><i class="fas fa-chevron-left mr-2"></i>Back to Grants </a>
             </div>
           </grant-details>
 
@@ -463,7 +463,7 @@
       {% include 'shared/footer_scripts.html' with slim=1 ignore_inject_web3=1 %}
       <script src='https://cdn.jsdelivr.net/npm/quill@1.3.6/dist/quill.min.js'></script>
       <script src='https://cdn.jsdelivr.net/npm/vue-quill-editor@3.0.6/dist/vue-quill-editor.js'></script>
-      {% bundle js file quill-image-extend-module %}
+      {% bundle js file grants-details-quill-image-extend-module %}
         <script>
           // use webpack to build ImageExtend
           import { QuillWatch, ImageExtend } from 'quill-image-extend-module';

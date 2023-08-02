@@ -14,6 +14,7 @@ from app.services import RedisService
 from celery import app
 from celery.utils.log import get_task_logger
 from dashboard.models import Profile
+from grants.ingest import handle_zksync_ingestion
 from grants.models import Grant, GrantCLR, GrantCollection, Subscription
 from grants.utils import bsci_script, get_clr_rounds_metadata, save_grant_to_notion, toggle_user_sybil
 from marketing.mails import (
@@ -115,7 +116,7 @@ def update_grant_metadata(self, grant_id, retry: bool = True) -> None:
 
     print(lineno(), round(time.time(), 2))
     from search.models import SearchResult
-    if instance.pk:
+    if instance.pk and instance.active and not instance.hidden:
         SearchResult.objects.update_or_create(
             source_type=ContentType.objects.get(app_label='grants', model='grant'),
             source_id=instance.pk,
@@ -369,16 +370,6 @@ def process_predict_clr(self, save_to_db, from_date, clr_round, network, what) -
 
     print(f"finished CLR estimates for {clr_round.round_num} {clr_round.sub_round_slug}")
 
-    # TOTAL GRANT
-    # grants = Grant.objects.filter(network=network, hidden=False, active=True, link_to_new_grant=None)
-    # grants = grants.filter(**clr_round.grant_filters)
-
-    # total_clr_distributed = 0
-    # for grant in grants:
-    #     total_clr_distributed += grant.clr_prediction_curve[0][1]
-
-    # print(f'Total CLR allocated for {clr_round.round_num} - {total_clr_distributed}')
-
 
 @app.shared_task(bind=True, max_retries=3)
 def process_grant_creation_email(self, grant_id, profile_id):
@@ -467,3 +458,12 @@ def process_bsci_sybil_csv(self, file_name, csv):
 @app.shared_task
 def sync_clr_match_payouts(network='mainnet', contract_address='0x0'):
     call_command('sync_clr_match_payouts', f'-n {network}', f'-c {contract_address}')
+
+
+@app.shared_task(bind=True, max_retries=3)
+def handle_zksync_ingestion_task(self, profile_id, network, identifier, do_write):
+    try:
+        profile = Profile.objects.get(pk=profile_id)
+        handle_zksync_ingestion(profile, network, identifier, do_write)
+    except Exception as e:
+        print(e)

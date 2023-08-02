@@ -1,10 +1,10 @@
 {% load static humanize i18n grants_extra %}
 <script type="text/x-template" id="template-grant-details">
   <div>
-  
+
     <slot></slot>
     <div class="container grid grid-template-sidebar">
-      <div class="grant-data">
+      <div class="grant-data overflow-auto">
         <!-- Inactive Grant -->
         <div v-if="!grant.active && !grant.verified">
           <b-alert show dismissible variant="primary" class="border border-primary">
@@ -12,10 +12,10 @@
               <div class="col-auto col-md-10">
                 <i class="fas fa-info-circle mr-2"></i>
                 <span class="text-black">
-                  <b>Your grant is currently inactive.</b> We review grants more often around grants rounds. Check your review status 
-                  <a 
-                    href="https://gitcoin.notion.site/fc5155ddb7804560a42387043bd805c1?v=937073ff11d149d29e08aa5901befc77" 
-                    rel="noopener noreferrer" 
+                  <b>Your grant is currently inactive.</b> We review grants more often around grants rounds. Check your review status
+                  <a
+                    href="https://gitcoin.notion.site/fc5155ddb7804560a42387043bd805c1?v=937073ff11d149d29e08aa5901befc77"
+                    rel="noopener noreferrer"
                     target="_blank"
                     class="text-black"
                   >
@@ -34,19 +34,26 @@
           <div class="row my-4">
 
             <div class="col-12 col-md-auto">
-              <!-- Grant Type -->
-              <a :href="`/grants/explorer/?grant_types=${item.fields.name}`"
-                v-for="item in grant.grant_type"
-                class="badge badge-pill bg-lightpurple text-primary py-1 px-2 font-smaller-2 font-weight-normal mr-2 text-capitalize">
-                [[item.fields.label]]
-              </a>
 
-              <!-- Grant Tags -->
-              <a :href="`/grants/explorer/?grant_tags=${item.fields.name}`"
-                v-for="item in grant.grant_tags"
-                class="badge badge-pill bg-lightpurple text-primary py-1 px-2 font-smaller-2 font-weight-normal mr-2">
-                [[item.fields.name]]
-              </a>
+              <!-- Grant Eligibility Tags -->
+              <template v-for="item in grant.grant_tags">
+                <a v-if="item.fields.is_eligibility_tag"
+                  v-b-tooltip.hover.bottom title="Eligibility Tag"
+                  class="badge badge-pill bg-tags text-primary py-1 px-2 font-smaller-2 font-weight-normal mr-2"
+                >
+                  [[item.fields.name]]
+                </a>
+              </template>
+
+              <!-- Grant Discovery Tags -->
+              <template v-for="item in grant.grant_tags">
+                <a v-if="!item.fields.is_eligibility_tag"
+                  v-b-tooltip.hover.bottom title="Discovery Tag"
+                  class="badge badge-pill bg-lightpurple text-primary py-1 px-2 font-smaller-2 font-weight-normal mr-2"
+                >
+                  [[item.fields.name]]
+                </a>
+              </template>
 
             </div>
 
@@ -85,7 +92,7 @@
                   class="col-auto badge badge-pill bg-lightpurple text-primary font-weight-semibold" id="wallet-zkscan-link">
                   zkSync
                 </a>
-                <a target="_blank" :href="`https://polygonscan.com/address/${grant.admin_address}`"
+                <a v-if="!grant.is_contract_address" target="_blank" :href="`https://polygonscan.com/address/${grant.admin_address}`"
                   class="col-auto badge badge-pill bg-lightpurple text-primary font-weight-semibold" id="wallet-polygonscan-link">
                   Polygon
                 </a>
@@ -208,6 +215,19 @@
                 <copy-clipboard class="btn btn-sm text-highlight-dark-blue" :string="grant.algorand_payout_address"><i class="far fa-copy"></i></copy-clipboard>
               </div>
             </template>
+
+            <!-- COSMOS -->
+            <template v-if="grant.tenants && grant.tenants.indexOf('COSMOS') > -1">
+              <div class="d-flex align-items-center">
+                <img class="mr-1 text-grey-400" src="{% static 'v2/images/chains/cosmos.svg' %}" alt="" width="16">
+                <a target="_blank" :href="`https://mintscan.io/cosmos/account/${grant.cosmos_payout_address}`">
+                  <span id="cosmos-address" class="wallet-address" v-b-tooltip.hover.bottom="grant.cosmos_payout_address">
+                    [[grant.cosmos_payout_address | truncateHash]]
+                  </span>
+                </a>
+                <copy-clipboard class="btn btn-sm text-highlight-dark-blue" :string="grant.cosmos_payout_address"><i class="far fa-copy"></i></copy-clipboard>
+              </div>
+            </template>
           </div>
 
           <!-- Twitter Verified-->
@@ -244,7 +264,7 @@
           <div class="col-12 col-md-5 col-md-auto mb-3 mb-md-1 text-grey-400">
             <i class="fas fa-stopwatch text-grey-400"></i>
             <span class="py-1 px-2 font-weight-normal mr-2">
-              Updated [[grant.last_update | moment]]
+              Updated [[grant.last_update]]
             </span>
           </div>
 
@@ -262,9 +282,9 @@
 
           <div class="row mt-2">
             <div class="col mb-5">
-              <h3>Lifetime funding received</h3>
-              <h2>$[[grant.amount_received || 0 | round | formatNumber ]]</h2>
-              <span>raised from all contributors</span>
+              <h3>Estimated lifetime funding received</h3>
+              <h2>[[ grant.rounded_lifetime_amount ]]</h2>
+              <span>This number should not be used for accounting purposes.</span>
             </div>
           </div>
 
@@ -279,13 +299,13 @@
 
           <div class="row mt-2" v-if="grant.clr_round_num && grant.is_clr_eligible">
             <div class="col col-4">
-              <h2>$[[ grant.amount_received_in_round || 0 | round | formatNumber ]]</h2>
+              <h2>$[[ grant.amount_received_in_round  ]]</h2>
               <span>
                 raised from [[ grant.positive_round_contributor_count ]] contributors
               </span>
             </div>
             <div v-if="grant?.clr_prediction_curve?.[0]?.[1] > 0" class="col col-4">
-              <h2 class="text-secondary">+$[[ grant?.clr_prediction_curve?.[0]?.[1] || 0 | round | formatNumber ]]</h2>
+              <h2 class="text-secondary">+$[[ grant?.clr_prediction_curve?.[0]?.[1] | formatNumber ]]</h2>
               <span>estimated QF matching</span>
               <i
                 class="fas fa-info-circle text-grey-400 mx-1 cursor-pointer"
@@ -297,8 +317,7 @@
                     <a href="https://gitcoin.co/blog/gitcoin-grants-quadratic-funding-for-the-world/" rel="noopener noreferrer" target="_blank">Learn more</a>
                   </p>
                   <p>
-                    This grant is currently part of [[ grant?.active_round_names.length ]] active matching round
-                    <template v-if="grant?.active_round_names.length > 1">s</template>:
+                    This grant is currently part of [[ grant?.active_round_names.length ]] active matching round<template v-if="grant?.active_round_names.length > 1">s</template>:
                     <dl class="mt-0">
                       <li v-for="round_name in grant.active_round_names">[[round_name]]</li>
                     </dl>
@@ -385,9 +404,6 @@
               </p>
               Your grant can still receive contributions, but will not get additional matching funds this round because it has reached the maximum matching cap.
             </b-card-text>
-            <a class="btn btn-block btn-primary" rel="noopener noreferrer" href="https://support.gitcoin.co/kb/article/134-learn-more-about-matching-rounds/" target="_blank">
-              Learn More
-            </a>
             <hr class="my-4">
           </template>
 
@@ -437,28 +453,6 @@
             <hr class="my-4">
           </template>
 
-          <!-- L2 contributions -->
-          <template v-if="grant.active && (grant.is_on_team || isStaff) && grant.tenants.includes('ETH')">
-            <b-card-text>
-              <p class="font-weight-semibold mb-2">
-                <i class="fal fa-wallet mr-1"></i>
-                You’ve received L2 contributions
-              </p>
-              Some of your grant funds may be in L2 (zkSync or Polygon).
-              <span v-if="grantIsContract">
-                Polygon contributions are not supported
-                for your grant since it is using a contract address (e.g. Gnosis Safe, multi-sig wallet).
-              </span>
-              <span v-else>
-                Read more on how to withdraw from L2 wallets.
-              </span>
-            </b-card-text>
-            <a class="btn btn-block btn-primary" rel="noopener noreferrer" href="https://support.gitcoin.co/kb/article/75-how-do-i-withdraw-my-funds-from-an-l2-layer-zksync-and-or-polygon-matic/" target="_blank">
-              Read L2 Withdrawal guide
-            </a>
-            <hr class="my-4">
-          </template>
-
 
           <!-- Edit Grant Button -->
           <template v-if="!grant.is_idle && (grant.is_on_team || isStaff)">
@@ -471,14 +465,39 @@
             </b-card-text>
             <button class="btn btn-block btn-primary" @click="editGrantModal()" v-if="fullview">Edit Grant</button>
             <a class="btn btn-block btn-primary" :href="grant.details_url" target="_blank" v-else>Edit Grant</a>
+            <hr class="my-4">
           </template>
+
+
+          <!-- L2 contributions -->
+          {% if has_recent_l2_contributions %}
+            <template v-if="grant.active && (grant.is_on_team || isStaff) && grant.tenants.includes('ETH')">
+              <b-card-text>
+                <p class="font-weight-semibold mb-2">
+                  <i class="fal fa-wallet mr-1"></i>
+                  You’ve received L2 contributions
+                </p>
+                Some of your grant funds may be in L2 (zkSync or Polygon).
+                <span v-if="grant.is_contract_address">
+                  Polygon contributions are not supported
+                  for your grant since it is using a contract address (e.g. Gnosis Safe, multi-sig wallet).
+                </span>
+                <span v-else>
+                  Read more on how to withdraw from L2 wallets.
+                </span>
+              </b-card-text>
+              <a class="btn btn-block btn-primary" rel="noopener noreferrer" href="https://support.gitcoin.co/gitcoin-grants/grantee-questions#withdrawing-funds" target="_blank">
+                Read L2 withdrawal guides
+              </a>
+            </template>
+          {% endif %}
 
         </b-card>
 
       </div>
 
       <!-- CLR details and Add-to/remove-from cart -->
-      <div class="grant-checkout">
+      <div class="grant-checkout text-nowrap">
         <div class="rounded shadow-sm bg-white px-3 pt-3 pb-3 border">
           <div v-if="grant.clr_prediction_curve?.length" style="max-width: 250px;" :class="`mx-auto mb-3 mt-2 position-relative${grant.clr_round_num && grant.is_clr_eligible ? '' : ' clr-disabled'}`">
             <svg width="145" height="77" viewBox="0 0 145 77" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -501,7 +520,7 @@
                     </p>
                   </div>
                 </b-tooltip>
-                <span class="text-secondary"><b>$[[prediction[2] || 0 | round]] match</b></span>
+                <span class="text-secondary"><b>$[[ prediction[2] ]] match</b></span>
               </div>
             </div>
           </div>
@@ -530,32 +549,47 @@
               :data-grant="grant.id"
             >
               <i :class="`${!grant.favorite ? 'far' : 'fa' } fa-star`" ></i>
-              Follow
+              Add to Favorites
             </button>
+            <b-alert
+              :show="dismissFavoriteAlertCountDown"
+              dismissible
+              variant="primary"
+              @dismissed="dismissFavoriteAlertCountDown = 0"
+              class="border border-primary alert-fixed-top mr-md-4 mr-0"
+            >
+              <div class="row">
+                <div class="col-auto col-md-7">
+                  <i class="fas fa-star mr-2"></i>
+                  <span class="text-black">Added to Favorites</span>
+                </div>
+                <div class="col-auto col-md-5 text-nowrap text-right">
+                  <a href="{% url 'grants:grants_explorer' %}?following=true&idle=true">View Favorites</a>
+                </div>
+              </div>
+            </b-alert>
           </div>
 
           <!-- Grants Rules-->
-          <div>
-            <div class="d-inline font-smaller-2 cursor-pointer" id="popover-target-1" style="width: 65px;">
-              <i class="fas fa-info-circle mr-2"></i>
-              Rules
-            </div>
-            <b-popover target="popover-target-1" triggers="hover" placement="left">
-              <template #title>Rules</template>
-              <p>Matching will not be applied if the rules are broken. Rules TLDR:</p>
-              <ul class="pl-3">
-                <li><b>DO NOT</b> offer anyone a quid-pro-quo for a contribution.</li>
-                <li><b>DO NOT</b> make up a new identity to contribute.</li>
-                <li><b>DO NOT</b> try to falsify a contribution.</li>
-              </ul>
-              If you see someone breaking the rules, please use 'Flag Grant' to report them.
-            </b-popover>
+          <div class="d-inline font-smaller-2 cursor-pointer my-auto" id="popover-target-1" style="width: 65px;">
+            <i class="fas fa-info-circle mr-2"></i>
+            Rules
+          </div>
+          <b-popover target="popover-target-1" triggers="hover" placement="left">
+            <template #title>Rules</template>
+            <p>Matching will not be applied if the rules are broken. Rules TLDR:</p>
+            <ul class="pl-3">
+              <li><b>DO NOT</b> offer anyone a quid-pro-quo for a contribution.</li>
+              <li><b>DO NOT</b> make up a new identity to contribute.</li>
+              <li><b>DO NOT</b> try to falsify a contribution.</li>
+            </ul>
+            If you see someone breaking the rules, please use 'Flag Grant' to report them.
+          </b-popover>
 
-            <!-- Grants Flag-->
-            <div class="ml-3 d-inline font-smaller-2 cursor-pointer" v-if="!grant.is_on_team" @click="flag">
-              <i class="text-grey-400 fas fa-flag mr-2"></i>
-              Flag
-            </div>
+          <!-- Grants Flag-->
+          <div class="ml-3 d-inline font-smaller-2 cursor-pointer my-auto" v-if="!grant.is_on_team" @click="flag">
+            <i class="text-grey-400 fas fa-flag mr-2"></i>
+            Flag
           </div>
 
         </div>
@@ -642,7 +676,7 @@
         </div>
         <div class="col-12 mb-3">
           <label class="mt-3 font-subheader letter-spacing text-grey-500" for="logo">
-            Project Logo
+            Project Banner
           </label>
           <div class="form__drop mt-0" id="js-drop" style="max-width: 345px; height: 128px;">
             <span v-if="!logoPreview">Drag & Drop or Browse</span>
@@ -746,7 +780,7 @@
           <b-tooltip custom-class="grant-edit-tooltip" target="grant-details-edit-tags" triggers="hover" placement="bottomright">
             Editing tags requires approval as it might affect your matching round eligibility. <a href="https://support.gitcoin.co/kb/article/134-learn-more-about-matching-rounds/">Learn more</a>
             <br><br>
-            To edit your tags, please contact us at <a href="mailto:support@gitcoin.co">support@gitcoin.co</a>
+            To request new tags, please fill in this <a target="_blank" href="https://docs.google.com/forms/d/e/1FAIpQLSeiaaPaYC2HkTvM_uXhlCeKSBVXX382rH4bEMDlyVynLCAeug/viewform">request form</a>
           </b-tooltip>
       </div>
 
@@ -791,7 +825,7 @@
           <h5 class="mt-5 mb-4 font-weight-normal">Funding Details</h5>
 
           <label class="font-subheader font-weight-light letter-spacing" for="bounty_chain">Select a blockchain</label>
-          
+
           <v-select id="grant-details-edit-funding-details" class="grant-edit-disable-select" placeholder="Select a blockchain to receive funding" :options="grantChains" label="label" v-model="chainId" :reduce="state => state.name" disabled>
             <template v-slot:option="option">
               <span class="font-weight-semibold">[[ option.label ]]</span>
@@ -800,7 +834,7 @@
 
           <b-tooltip custom-class="grant-edit-tooltip" target="grant-details-edit-funding-details" triggers="hover" placement="bottomright">
             To edit your funding details, please contact us at <a href="mailto:support@gitcoin.co">support@gitcoin.co</a>
-          </b-tooltip> 
+          </b-tooltip>
         </div>
 
         <!-- Wallet Address -->
@@ -809,7 +843,7 @@
             <label class="font-subheader font-weight-light letter-spacing" for="eth_payout_address">
               ETH Recipient Wallet Address
             </label>
-            
+
             <div id="eth_payout_address_wrapper">
               <input id="eth_payout_address" v-model="grant.admin_address" name="eth_payout_address" class="form__input form__input-lg vs--disabled" maxlength="50" placeholder="0x0" required disabled/>
             </div>
@@ -947,6 +981,20 @@
             </b-tooltip>
           </template>
 
+          <template v-if="grant.tenants && grant.tenants.indexOf('COSMOS') > -1">
+            <label class="font-subheader font-weight-light letter-spacing" for="cosmos_payout_address">
+              Cosmos Recipient Wallet Address
+            </label>
+
+            <div id="cosmos_payout_address_wrapper">
+              <input id="cosmos_payout_address" v-model="grant.cosmos_payout_address" name="cosmos_payout_address" class="form__input form__input-lg" maxlength="50" placeholder="0x0" required disabled/>
+            </div>
+
+            <b-tooltip custom-class="grant-edit-tooltip" target="cosmos_payout_address_wrapper" triggers="hover" placement="bottomright">
+              To edit your funding details, please contact us at <a href="mailto:support@gitcoin.co">support@gitcoin.co</a>
+            </b-tooltip>
+          </template>
+
         </div>
 
         <!-- Save/Cancel -->
@@ -967,11 +1015,9 @@
     </b-sidebar>
 
   </div>
-
 </script>
 
 <style>
-
   .badge-greylight {
     color: #757087;
   }
@@ -1023,7 +1069,8 @@
     color: #f8f8f2;
     overflow: visible;
     border-radius: 3px;
-    counter-reset: list-1 list-2 list-3 list-4 list-5 list-6 list-7 list-8 list-9;
+    counter-reset: list-1 list-2 list-3 list-4 list-5 list-6 list-7 list-8
+      list-9;
   }
 
   .ql-toolbar.ql-snow {
@@ -1062,7 +1109,7 @@
     border-radius: 4px !important;
   }
 
-  input[type=color]{
+  input[type="color"] {
     width: 20px;
     height: 20px;
     border: none;
@@ -1095,10 +1142,20 @@
     grid-template-areas: "grant-data";
   }
 
+  .bg-tags {
+    background-color: #d0e2ff;
+  }
+
   @media only screen and (max-width: 600px) {
     #sidebar-grant-edit {
       padding: 10px 0px;
       width: 100% !important;
+    }
+  }
+
+  @media (max-width: 960px) {
+    .grant_data {
+      overflow: hidden;
     }
   }
 
@@ -1115,6 +1172,5 @@
     .grid-template-sidebar-row {
       grid-auto-columns: 1fr 1fr 1fr 1.2fr;
     }
-  } 
-
+  }
 </style>

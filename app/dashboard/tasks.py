@@ -3,6 +3,9 @@ import json
 import math
 import os
 from datetime import datetime
+from functools import reduce
+from operator import add
+from pprint import pformat
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -15,12 +18,19 @@ from app.services import RedisService
 from app.utils import get_location_from_ip
 from celery import app, group
 from celery.utils.log import get_task_logger
-from dashboard.models import Activity, Bounty, Earning, ObjectView, Profile, TransactionHistory, UserAction
+from dashboard.models import (
+    Activity, Bounty, Earning, ObjectView, Passport, PassportStamp, Profile, TransactionHistory, UserAction,
+)
 from dashboard.utils import get_tx_status_and_details
 from economy.models import EncodeAnything
 from marketing.mails import func_name, grant_update_email, send_mail
+from passport_score.models import GR15TrustScore
+from passport_score.utils import compute_min_trust_bonus_for_user, handle_submitted_passport, handle_submitted_stamps
+from passport_score.views import compute_gr15_apu
 from proxy.views import proxy_view
 from retail.emails import render_share_bounty
+
+from .passport_reader import SCORER_SERVICE_WEIGHTS, TRUSTED_IAM_ISSUER, get_passport, get_stream_ids
 
 logger = get_task_logger(__name__)
 
@@ -240,6 +250,10 @@ def profile_dict(self, pk, retry: bool = True) -> None:
     :param pk:
     :return:
     """
+
+    if settings.FLUSH_QUEUE:
+        return
+
     if isinstance(pk, list):
         pk = pk[0]
     with redis.lock("tasks:profile_dict:%s" % pk, timeout=LOCK_TIMEOUT):
@@ -311,7 +325,7 @@ def m2m_changed_interested(self, bounty_pk, retry: bool = True) -> None:
     :param bounty_pk:
     :return:
     """
-    with redis.lock("m2m_changed_interested:bounty", timeout=LOCK_TIMEOUT):
+    with redis.lock(f"m2m_changed_interested:bounty:{bounty_pk}", timeout=LOCK_TIMEOUT):
         bounty = Bounty.objects.get(pk=bounty_pk)
         from dashboard.notifications import maybe_market_to_github
         maybe_market_to_github(bounty, 'work_started',
@@ -353,6 +367,10 @@ def increment_view_count(self, pks, content_type, user_id, view_type, retry: boo
 
 @app.shared_task(bind=True, max_retries=1)
 def sync_profile(self, handle, user_pk, hide_profile, retry: bool = True) -> None:
+
+    if settings.FLUSH_QUEUE:
+        return
+
     from app.utils import actually_sync_profile
     user = User.objects.filter(pk=user_pk).first() if user_pk else None
     actually_sync_profile(handle, user=user, hide_profile=hide_profile)
@@ -360,6 +378,10 @@ def sync_profile(self, handle, user_pk, hide_profile, retry: bool = True) -> Non
 
 @app.shared_task(bind=True, max_retries=1)
 def recalculate_earning(self, pk, retry: bool = True) -> None:
+
+    if settings.FLUSH_QUEUE:
+        return
+
     from dashboard.models import Earning
     earning = Earning.objects.get(pk=pk)
     src = earning.source
@@ -381,6 +403,9 @@ def record_visit(self, user_pk, profile_pk, ip_address, visitorId, useragent, re
     :param utm: _get_utm_from_cookie(request)
     :return: None
     """
+
+    if settings.FLUSH_QUEUE:
+        return
 
     user = User.objects.filter(pk=user_pk).first() if user_pk else None
     profile = Profile.objects.filter(pk=profile_pk).first() if profile_pk else None
@@ -436,10 +461,13 @@ def record_join(self, profile_pk, retry: bool = True) -> None:
     """
 
     # There seems to be a race condition, this is task is sometimes
-    # executed in parallel for the same profile. And this leads to an integrity 
+    # executed in parallel for the same profile. And this leads to an integrity
     # error (becasue Activity.objects.create also performs delete operations in a
     # post_save signal)
     # To avoid the integrity error we execute this operation in a transaction
+    if settings.FLUSH_QUEUE:
+        return
+
     with transaction.atomic():
         profile = Profile.objects.filter(pk=profile_pk).first() if profile_pk else None
         if profile:
@@ -475,3 +503,128 @@ def save_tx_status_and_details(self, earning_pk, chain='std'):
             txid=txid,
             captured_at=timezone.now(),
         )
+
+
+@app.shared_task
+def calculate_trust_bonus(user_id, did, address):
+    """
+    :param self: Self
+    :param user_id: the user_id
+    :param did: the did for the passport
+    :return: None
+    """
+
+    # delay import as this is only available in celery envs
+    import didkit
+
+    try:
+
+        # Pull streamIds from Ceramic Account associated with DID
+        stream_ids = get_stream_ids(did)
+
+        # No Ceramic Account found for user
+        if not stream_ids:
+            raise Exception(f"No Ceramic Account found for '{did}'")
+
+        # check account against did
+        is_owner = did.lower() == f"did:pkh:eip155:1:{address.lower()}"
+
+        # Invalid owner
+        if not is_owner:
+            raise Exception(f"Bad owner when checking did '{did}'")
+
+        # Retrieve DIDs Passport from Ceramic
+        passport = get_passport(stream_ids=stream_ids)
+
+        # No Passport discovered
+        if not passport:
+            raise Exception(f"No Passport discovered for '{did}'")
+
+        db_passport = handle_submitted_passport(user_id, did, passport)
+        stamp_validation_list = []
+
+        # Check the validity of each stamp in the passport
+        valid_stamps = []
+        for stamp in passport['stamps']:
+            try:
+                if stamp and stamp['credential'] and stamp["provider"]:
+                    stamp_validation = {
+                        "provider": stamp["provider"],
+                        "is_verified": False,
+                        "errors": []
+                    }
+                    stamp_validation_list.append(stamp_validation)
+
+                    # get the user credential ID, this will have the form: "did:ethr:0x...#POAP"
+                    subject_id = stamp["credential"]["credentialSubject"]["id"]
+
+                    # the subjectId must match the users DID
+                    is_subject_valid = subject_id.lower() == did.lower()
+
+                    stamp_expiration_date = stamp["credential"]["expirationDate"]
+                    # the stamp must not have expired before being registered (when expiry comes around, should we expire the stamp on the scorer side?)
+                    try:
+                        is_stamp_expired = datetime.strptime(stamp_expiration_date, "%Y-%m-%dT%H:%M:%S.%fZ") < datetime.now()
+                    except:
+                        # In some cases the microseconds are missing in the timestamp (has been encountered in production)
+                        is_stamp_expired = datetime.strptime(stamp_expiration_date, "%Y-%m-%dT%H:%M:%SZ") < datetime.now()
+
+
+                    # the stamp must be issued by the trusted IAM server
+                    is_issued_by_iam = stamp["credential"]["issuer"] == TRUSTED_IAM_ISSUER
+
+                    # check that the provider matches the provider in the VC
+                    is_for_provider = stamp["provider"] == stamp["credential"]["credentialSubject"]["provider"]
+
+                    if not is_subject_valid:
+                        msg = "Invalid stamp subject: %s != %s" %( subject_id, did)
+                        stamp_validation["errors"].append(msg)
+                        logger.error(msg)
+
+                    if is_stamp_expired:
+                        mag = "Expired stamp (%s): %s" % ( subject_id, stamp["credential"]["expirationDate"])
+                        stamp_validation["errors"].append(msg)
+                        logger.error(msg)
+
+                    if not is_issued_by_iam:
+                        msg = "Stamp issuer missmatch: '%s' != '%s'" %( TRUSTED_IAM_ISSUER, stamp["credential"]["issuer"])
+                        stamp_validation["errors"].append(msg)
+                        logger.error(msg)
+
+                    if not is_for_provider:
+                        msg = "Stamp provider missmatch: '%s' != '%s' " % ( stamp["provider"], stamp["credential"]["credentialSubject"]["provider"])
+                        stamp_validation["errors"].append(msg)
+                        logger.error(msg)
+
+                    if is_subject_valid and not is_stamp_expired and is_issued_by_iam and is_for_provider:
+                        # Proceed with verifying the credential
+                        verification = didkit.verifyCredential(json.dumps(stamp["credential"]), '{"proofPurpose":"assertionMethod"}')
+                        verification = json.loads(verification)
+
+                        # Check that the credential verified
+                        stamp['is_verified'] = (not verification["errors"])
+
+                        # Given a valid stamp - set is_verified and add stamp to returns
+                        if stamp['is_verified']:
+                            stamp_validation['is_verified'] = True
+
+                            valid_stamps.append(stamp)
+
+                handle_submitted_stamps(db_passport, user_id, valid_stamps)
+
+            except Exception as e:
+                logger.error("Error verifying the stamp: %s. Error: %s", stamp, e, exc_info=True)
+
+        compute_min_trust_bonus_for_user(user_id)
+
+    except Exception as e:
+        # Log the error
+        logger.error(e)
+        # We expect this verification to throw
+        logger.error("Error calculating trust bonus score!", exc_info=True)
+        profile = Profile.objects.get(user_id=user_id)
+        profile.passport_trust_bonus = profile.passport_trust_bonus or 0.5
+        profile.passport_trust_bonus_status = f"Error: {e}"[:255]
+        profile.passport_trust_bonus_last_updated = timezone.now()
+        profile.passport_trust_bonus_stamp_validation = []
+        profile.save()

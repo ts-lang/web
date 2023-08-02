@@ -28,13 +28,13 @@ from django.utils.translation import gettext_lazy as _
 
 import sendgrid
 from app.utils import get_profiles_from_text
-from marketing.utils import allowed_to_send_email, func_name, get_or_save_email_subscriber
+from marketing.common.utils import allowed_to_send_email, func_name, get_or_save_email_subscriber
 from python_http_client.exceptions import HTTPError, UnauthorizedError
 from retail.emails import (
     email_to_profile, get_notification_count, render_admin_contact_funder, render_bounty_changed,
-    render_bounty_expire_warning, render_bounty_feedback, render_bounty_hypercharged,
+    render_bounty_expire_warning, render_bounty_hypercharged,
     render_bounty_startwork_expire_warning, render_bounty_unintersted, render_comment, render_featured_funded_bounty,
-    render_funder_payout_reminder, render_funder_stale, render_gdpr_reconsent, render_gdpr_update,
+    render_funder_payout_reminder, render_gdpr_reconsent, render_gdpr_update,
     render_grant_cancellation_email, render_grant_match_distribution_final_txn, render_grant_recontribute,
     render_grant_txn_failed, render_grant_update, render_match_distribution, render_match_email, render_mention,
     render_new_bounty, render_new_bounty_acceptance, render_new_bounty_rejection, render_new_bounty_roundup,
@@ -117,14 +117,12 @@ def send_mail(from_email, _to_email, subject, body, html=False,
         mail.add_attachment(attachment)
 
     if csv is not None:
-        with open(csv, 'rb') as f:
-            data = f.read()
-            f.close()
+        data = csv.getvalue().encode('utf-8')
         encoded = base64.b64encode(data).decode()
         attachment = Attachment()
         attachment.content = encoded
         attachment.type = 'text/csv'
-        attachment.filename = csv.replace('/tmp/', '')
+        attachment.filename = f"{timezone.now().strftime('%Y_%m_%dT%H')}.csv"
         attachment.disposition = 'attachment'
         mail.add_attachment(attachment)
     # debug logs
@@ -132,11 +130,11 @@ def send_mail(from_email, _to_email, subject, body, html=False,
     try:
         response = sg.client.mail.send.post(request_body=mail.get())
     except UnauthorizedError as e:
-        logger.debug(
+        logger.error(
             f'-- Sendgrid Mail failure - {_to_email} / {categories} - Unauthorized - Check sendgrid credentials')
         logger.debug(e)
     except HTTPError as e:
-        logger.debug(f'-- Sendgrid Mail failure - {_to_email} / {categories} - {e}')
+        logger.error(f'-- Sendgrid Mail failure - {_to_email} / {categories} - {e}')
 
     return response
 
@@ -432,70 +430,6 @@ def admin_contact_funder(bounty, text, from_user):
                 text,
                 cc_emails=cc_emails,
                 from_name=from_email,
-                categories=['transactional', func_name()],
-            )
-    finally:
-        translation.activate(cur_language)
-
-
-def funder_stale(to_email, github_username, days=30, time_as_str='about a month'):
-    from_email = 'product@gitcoin.co'
-    cur_language = translation.get_language()
-    try:
-        setup_lang(to_email)
-
-        subject = "hey from gitcoin.co" if not github_username else f"hey @{github_username}"
-        __, text = render_funder_stale(github_username, days, time_as_str)
-        cc_emails = []
-        if allowed_to_send_email(to_email, 'admin_contact_funder'):
-            send_mail(
-                from_email,
-                to_email,
-                subject,
-                text,
-                cc_emails=cc_emails,
-                from_name=from_email,
-                categories=['transactional', func_name()],
-            )
-    finally:
-        translation.activate(cur_language)
-
-
-def bounty_feedback(bounty, persona='fulfiller', previous_bounties=None):
-    from_email = 'product@gitcoin.co'
-    to_email = None
-    cur_language = translation.get_language()
-    if previous_bounties is None:
-        previous_bounties = []
-
-    try:
-        setup_lang(to_email)
-        if persona == 'fulfiller':
-            accepted_fulfillments = bounty.fulfillments.filter(accepted=True)
-            to_email = accepted_fulfillments.first().fulfiller_email if accepted_fulfillments.exists() else ""
-        elif persona == 'funder':
-            to_email = bounty.bounty_owner_email
-            if not to_email:
-                if bounty.bounty_owner_profile:
-                    to_email = bounty.bounty_owner_profile.email
-            if not to_email:
-                if bounty.bounty_owner_profile and bounty.bounty_owner_profile.user:
-                    to_email = bounty.bounty_owner_profile.user.email
-        if not to_email:
-            return
-
-        subject = bounty.github_url
-        html, text = render_bounty_feedback(bounty, persona, previous_bounties)
-        cc_emails = [from_email, 'product@gitcoin.co']
-        if allowed_to_send_email(to_email, 'bounty_feedback'):
-            send_mail(
-                from_email,
-                to_email,
-                subject,
-                text,
-                html,
-                cc_emails=cc_emails,
-                from_name="Gitcoin Product Team",
                 categories=['transactional', func_name()],
             )
     finally:
@@ -963,21 +897,6 @@ def warn_account_out_of_eth(account, balance, denomination):
         translation.activate(cur_language)
 
 
-def new_feedback(email, feedback):
-    to_email = 'product@gitcoin.co'
-    from_email = settings.SERVER_EMAIL
-    subject = "New Feedback"
-    body = f"New feedback from {email}: {feedback}"
-    send_mail(
-        from_email,
-        to_email,
-        subject,
-        body,
-        from_name="No Reply from Gitcoin.co",
-        categories=['admin', func_name()],
-    )
-
-
 def gdpr_reconsent(email):
     to_email = email
     from_email = settings.PERSONAL_CONTACT_EMAIL
@@ -1113,7 +1032,7 @@ def grant_match_distribution_final_txn(match, needs_claimed=False):
         setup_lang(to_email)
         subject = f"🎉 Your Match Distribution of {rounded_amount} DAI has been sent! 🎉"
         if needs_claimed:
-            subject = f"💰ACTION REQUIRED - Your Grants Round {match.round_number} Distribution of {rounded_amount} DAI"
+            subject = f"💰ACTION REQUIRED - Your Grants Round {match.round_number} Distribution of {rounded_amount} {match.token_symbol}"
 
         html, text = render_grant_match_distribution_final_txn(match)
 
@@ -1888,7 +1807,7 @@ def remember_your_cart(profile, cart_query, grants, hours):
 
 def tribe_hackathon_prizes(hackathon):
     from dashboard.models import TribeMember, Sponsor
-    from marketing.utils import generate_hackathon_email_intro
+    from marketing.common.utils import generate_hackathon_email_intro
 
     sponsors = hackathon.sponsor_profiles.all()
     tribe_members_in_sponsors = TribeMember.objects.filter(org__in=[sponsor for sponsor in sponsors]).exclude(status='rejected').exclude(profile__user=None).only('profile')

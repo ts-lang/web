@@ -41,6 +41,7 @@ from dashboard.sync.binance import sync_binance_payout
 from dashboard.sync.btc import sync_btc_payout
 from dashboard.sync.casper import sync_casper_payout
 from dashboard.sync.celo import sync_celo_payout
+from dashboard.sync.cosmos import sync_cosmos_payout
 from dashboard.sync.etc import sync_etc_payout
 from dashboard.sync.eth import sync_eth_payout
 from dashboard.sync.filecoin import sync_filecoin_payout
@@ -314,6 +315,10 @@ def get_web3(network, sockets=False, chain='std'):
                 provider = HTTPProvider(f'https://{network}.infura.io/v3/{settings.INFURA_V3_PROJECT_ID}')
             else:
                 provider = HTTPProvider(f'https://{network}.infura.io')
+        
+        # Infura is throwing 403 errors on polygon due to current plan. Using Polygon RPC instead
+        if network == 'polygon-mainnet':
+            provider = HTTPProvider(f'https://polygon-mainnet.g.alchemy.com/v2/{settings.ALCHEMY_KEY}')
 
         w3 = Web3(provider)
         if network == 'rinkeby':
@@ -678,6 +683,9 @@ def sync_payout(fulfillment):
 
     elif fulfillment.payout_type == 'casper_ext':
         sync_casper_payout(fulfillment)
+
+    elif fulfillment.payout_type == 'cosmos_ext':
+        sync_cosmos_payout(fulfillment)
 
 
 def get_bounty_id(issue_url, network):

@@ -6,6 +6,21 @@ Quill.register('modules/ImageExtend', ImageExtend);
 
 Vue.mixin({
   methods: {
+    formatDonationAmounts(grant) {
+      const amountReceived = Vue.filter('round')(grant.amount_received || 0);
+      const amountRecievedInRound = Vue.filter('round')(grant.amount_received_in_round || 0);
+
+      grant.clr_prediction_curve = grant.clr_prediction_curve.map((prediction) => {
+        prediction[0] = Vue.filter('round')(prediction[0] || 0);
+        prediction[1] = Vue.filter('round')(prediction[1] || 0);
+        prediction[2] = Vue.filter('round')(prediction[2] || 0);
+        return prediction;
+      });
+      grant.last_update = Vue.filter('moment')(grant.last_update);
+      grant.amount_received = Vue.filter('formatNumber')(amountReceived);
+      grant.amount_received_in_round = Vue.filter('formatNumber')(amountRecievedInRound);
+      return grant;
+    },
     fetchGrantDetails: function(id) {
       const vm = this;
 
@@ -21,7 +36,7 @@ Vue.mixin({
         fetch(url).then(function(res) {
           return res.json();
         }).then(function(json) {
-          vm.grant = json.grants;
+          vm.grant = vm.formatDonationAmounts(json.grants);
           vm.loading = false;
 
           // pick up the curve from the grants model
@@ -124,17 +139,6 @@ Vue.mixin({
 
       }).catch(console.error);
     },
-    backNavigation: function() {
-      const vm = this;
-      const lgt = localStorage.getItem('last_grants_title') || 'Grants';
-
-      const lgi = (document.referrer.indexOf(location.host) != -1 && !document.referrer.includes('grants/new')) ? 'javascript:history.back()' : '/grants/explorer';
-
-      if (lgi && lgt) {
-        vm.$set(vm.backLink, 'url', lgi);
-        vm.$set(vm.backLink, 'title', lgt);
-      }
-    },
     scrollToElement(element) {
       const container = this.$refs[element];
 
@@ -173,16 +177,11 @@ if (document.getElementById('gc-grant-detail')) {
         isStaff: isStaff,
         grant: {},
         tabSelected: 0,
-        tab: null,
-        backLink: {
-          url: '/grants',
-          title: 'Grants'
-        }
+        tab: null
       };
     },
     mounted: function() {
       this.enableTab();
-      this.backNavigation();
       this.fetchGrantDetails();
     }
   });

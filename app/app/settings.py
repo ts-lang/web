@@ -25,6 +25,7 @@ import warnings
 from django.utils.translation import gettext_noop
 
 import environ
+import mimetypes
 import raven
 import sentry_sdk
 from boto3.session import Session
@@ -76,6 +77,10 @@ TWILIO_FRIENDLY_NAMES = env.list('TWILIO_FRIENDLY_NAMES', default=['VERIFY'])
 
 # Notifications - Global on / off switch
 ENABLE_NOTIFICATIONS_ON_NETWORK = env('ENABLE_NOTIFICATIONS_ON_NETWORK', default='mainnet')
+
+# Set .wasm mime type for dev env
+if DEBUG:
+    mimetypes.add_type("application/wasm", ".wasm", True)
 
 # Application definition
 INSTALLED_APPS = [
@@ -151,7 +156,9 @@ INSTALLED_APPS = [
     'adminsortable2',
     'debug_toolbar',
     'passport',
-    'quadraticlands'
+    'quadraticlands',
+    'mautic_logging',
+    'passport_score',
 ]
 
 MIDDLEWARE = [
@@ -160,6 +167,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'app.middleware.drop_accept_language',
+    'app.middleware.drop_recaptcha_post',
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -311,7 +319,14 @@ AWS_LOG_STREAM = env('AWS_LOG_STREAM', default=f'{ENV}-web')
 # Sentry
 SENTRY_DSN = env.str('SENTRY_DSN', default='')
 SENTRY_JS_DSN = env.str('SENTRY_JS_DSN', default=SENTRY_DSN)
-RELEASE = raven.fetch_git_sha(os.path.abspath(os.pardir)) if ENV == 'prod' else ''
+
+# In case we are running / deploying from within a git repo, we want to use the git repo SHA
+# In case we are not in a github repo, we rely on an environment variable
+try:
+    RELEASE = raven.fetch_git_sha(os.path.abspath(os.pardir)) if ENV == 'prod' else ''
+except:
+    RELEASE = env.str('GITHUB_SHA', default=' - dev build - ')
+
 RAVEN_JS_VERSION = env.str('RAVEN_JS_VERSION', default='6.8.0')
 if SENTRY_DSN:
     sentry_sdk.init(
@@ -524,10 +539,17 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default=CACHEOPS_REDIS)
 # https://docs.celeryproject.org/en/latest/userguide/configuration.html#std-setting-task_routes
 CELERY_ROUTES = [
+    ('dashboard.tasks.calculate_trust_bonus', {'queue': 'gitcoin_passport'}),
     ('grants.tasks.process_grant_contribution', {'queue': 'high_priority'}),
     ('grants.tasks.batch_process_grant_contributions', {'queue': 'high_priority'}),
+    ('grants.tasks.handle_zksync_ingestion_task', {'queue': 'high_priority'}),
     ('kudos.tasks.mint_token_request', {'queue': 'high_priority'}),
     ('dashboard.tasks.increment_view_count', {'queue': 'analytics'}),
+    ('dashboard.tasks.record_visit', {'queue': 'analytics'}),
+    ('dashboard.tasks.record_join', {'queue': 'analytics'}),
+    ('townsquare.tasks.increment_offer_view_counts', {'queue': 'analytics'}),
+    ('townsquare.tasks.increment_view_counts', {'queue': 'analytics'}),
+    ('townsquare.tasks.send_comment_email', {'queue': 'marketing'}),
     ('marketing.tasks.*', {'queue': 'marketing'}),
     ('grants.tasks.*', {'queue': 'default'}),
     ('dashboard.tasks.*', {'queue': 'default'}),
@@ -566,6 +588,7 @@ SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
 
 CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=False)
 CSRF_COOKIE_HTTPONLY = env.bool('CSRF_COOKIE_HTTPONLY', default=True)
+CSRF_FAILURE_VIEW = 'retail.views.csrf_failure'
 SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=False)
 SECURE_BROWSER_XSS_FILTER = env.bool('SECURE_BROWSER_XSS_FILTER', default=True)
 SECURE_CONTENT_TYPE_NOSNIFF = env.bool('SECURE_CONTENT_TYPE_NOSNIFF', default=True)
@@ -802,6 +825,7 @@ GITHUB_EVENT_HOOK_URL = env('GITHUB_EVENT_HOOK_URL', default='github/payload/')
 WEB3_HTTP_PROVIDER = env('WEB3_HTTP_PROVIDER', default='https://rinkeby.infura.io')
 INFURA_USE_V3 = env.bool('INFURA_USE_V3', False)
 INFURA_V3_PROJECT_ID = env('INFURA_V3_PROJECT_ID', default='1e0a90928efe4bb78bb1eeceb8aacc27')
+ALCHEMY_KEY = env('ALCHEMY_KEY', default='1e0a90928efe4bb78bb1eeceb8aacc27')
 
 # COLO Coin
 COLO_ACCOUNT_ADDRESS = env('COLO_ACCOUNT_ADDRESS', default='')  # TODO
@@ -888,6 +912,7 @@ TIP_PAYOUT_PRIVATE_KEY = env('TIP_PAYOUT_PRIVATE_KEY', default='0x00De4B13153673
 
 
 ELASTIC_SEARCH_URL = env('ELASTIC_SEARCH_URL', default='')
+ACTIVE_ELASTIC_INDEX = env('ACTIVE_ELASTIC_INDEX', default='search-index-1')
 
 account_sid = env('TWILIO_ACCOUNT_SID', default='')
 auth_token = env('TWILIO_AUTH_TOKEN', default='')
@@ -936,3 +961,11 @@ CELERY_NODE = env.bool('CELERY_NODE', default=False)
 # GTC Token Distribution
 GTC_DIST_API_URL = env('GTC_DIST_API_URL', default='http://localhost:8000/not-valid-url')
 GTC_DIST_KEY = env('GTC_DIST_KEY', default='')
+
+# BUNDLE settings
+# Generating a checksun is optional. When egenerating the static files for a container build
+# we do not want to add a checksum
+BUNDLE_USE_CHECKSUM = env('BUNDLE_USE_CHECKSUM', default=True)
+
+# Datadog token for UI logging
+DATADOG_TOKEN = env('DATADOG_TOKEN', default=None)

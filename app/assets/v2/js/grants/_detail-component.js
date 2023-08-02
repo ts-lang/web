@@ -31,9 +31,39 @@ Vue.mixin({
 
       vm.$set(vm.grant, 'isInCart', true);
       CartData.addToCart(response.grant);
+
+      gtag('event', 'add_to_cart', {
+        // value, currency are set when checking out, but required
+        value: 0,
+        currency: 'USD',
+        items: [
+          {
+            item_id: vm.grant.id,
+            item_name: vm.grant.title,
+            item_category: vm.grant?.active_round_names?.toString(),
+            item_brand: vm.grant?.admin_profile?.handle,
+            quantity: 1
+          }
+        ]
+      });
     },
     removeFromCart: function() {
       const vm = this;
+
+      gtag('event', 'remove_from_cart', {
+        // value, currency are set when checking out, but required
+        value: 0,
+        currency: 'USD',
+        items: [
+          {
+            item_id: vm.grant.id,
+            item_name: vm.grant.title,
+            item_category: vm.grant?.active_round_names?.toString(),
+            item_brand: vm.grant?.admin_profile?.handle,
+            quantity: 1
+          }
+        ]
+      });
 
       vm.$set(vm.grant, 'isInCart', false);
       CartData.removeIdFromCart(vm.grant.id);
@@ -81,6 +111,7 @@ Vue.mixin({
         'kusama_payout_address': vm.grant.kusama_payout_address,
         'rsk_payout_address': vm.grant.rsk_payout_address,
         'algorand_payout_address': vm.grant.algorand_payout_address,
+        'cosmos_payout_address': vm.grant.cosmos_payout_address,
         'region': vm.grant.region?.name || undefined,
         'has_external_funding': vm.grant.has_external_funding,
         'grant_tags[]': JSON.stringify(vm.grantTagsFormatted)
@@ -167,6 +198,7 @@ Vue.mixin({
 
       if (response.action === 'follow') {
         vm.grant.favorite = true;
+        vm.dismissFavoriteAlertCountDown = 10;
       } else {
         vm.grant.favorite = false;
       }
@@ -373,7 +405,7 @@ Vue.mixin({
   computed: {
     teamFormatted: {
       get() {
-        return this.grant.team_members.map((user)=> {
+        return this.grant.team_members ? this.grant.team_members.map((user)=> {
           if (!user?.fields) {
             return user;
           }
@@ -383,11 +415,11 @@ Vue.mixin({
           newTeam['avatar_url'] = `/dynamic/avatar/${user.fields.handle}`;
           newTeam['text'] = user.fields.handle;
           return newTeam;
-        });
+        }) : [];
 
       },
       set(value) {
-        this.grant.team_members = value.map((user) => {
+        this.grant.team_members = value ? value.map((user) => {
 
           return {
             fields: {
@@ -396,7 +428,7 @@ Vue.mixin({
             model: 'dashboard.profile',
             pk: user.id
           };
-        });
+        }) : [];
       }
     },
     grantTagsFormatted: {
@@ -496,6 +528,7 @@ Vue.component('grant-details', {
       logo: null,
       logoPreview: null,
       logoBackground: null,
+      dismissFavoriteAlertCountDown: 0,
       rows: 0,
       perPage: 4,
       currentPage: 1,
@@ -556,7 +589,7 @@ Vue.component('grant-details', {
         { 'name': 'kusama', 'label': 'Kusama'},
         { 'name': 'algorand', 'label': 'Algorand'}
       ],
-      grant_tags: document.grant_tags,
+      grant_tags: document.grant_tags ?? [],
       grant_salected_tags: [],
       externalFundingOptions: [
         {'key': 'yes', 'value': 'Yes, this project has raised external funding.'},
@@ -564,10 +597,8 @@ Vue.component('grant-details', {
       ]
     };
   },
-  computed: {
-    async grantIsContract() {
-      const { admin_address } = this.grant;
-
+  methods: {
+    grantIsContract: async function(admin_address) {
       if (admin_address && web3 && web3.eth) {
         const code = await web3.eth.getCode(admin_address);
 
@@ -576,13 +607,19 @@ Vue.component('grant-details', {
       return false;
     }
   },
-  mounted: function() {
+  mounted: async function() {
     const vm = this;
 
     vm.grant_twitter_handle_1 = vm.grant.twitter_handle_1;
     vm.grant.description_rich_edited = vm.grant.description_rich;
-    vm.grant_salected_tags = vm.grant.grant_tags.map(tag => tag.pk);
+    vm.grant_salected_tags = vm.grant.grant_tags ? vm.grant.grant_tags.map(tag => tag.pk) : [];
     vm.chainId = vm.grant.tenants.length > 0 ? vm.grant.tenants[0].toLowerCase() : '';
+
+    const amount_received = isNaN(vm.grant.amount_received) ? Number(vm.grant.amount_received.replace(',', '')) : Number(vm.grant.amount_received);
+    const rounded_lifetime_amount = Math.round(amount_received / 1000) * 1000;
+
+    vm.grant.rounded_lifetime_amount = (rounded_lifetime_amount > 1000) ?
+      `~$${rounded_lifetime_amount.toLocaleString()}` : 'Less than $1,000';
 
     if (vm.grant.description_rich_edited) {
       vm.editor.updateContents(JSON.parse(vm.grant.description_rich));
@@ -591,6 +628,20 @@ Vue.component('grant-details', {
 
     // watch for cartUpdates
     window.addEventListener('cartDataUpdated', vm.updateCartData);
+
+    gtag('event', 'view_item', {
+      // currency and value are required items but value is not known until cart
+      currency: 'USD',
+      value: 0,
+      items: [
+        {
+          item_id: vm.grant.id,
+          item_name: vm.grant.title,
+          item_category: vm.grant.clr_round_num,
+          item_brand: vm.grant.admin_address
+        }
+      ]
+    });
   },
   beforeDestroy() {
     const vm = this;

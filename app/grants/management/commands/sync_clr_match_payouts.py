@@ -17,9 +17,9 @@ class MatchesContract:
         self.contract = w3.eth.contract(address=address, abi=settings.MATCH_PAYOUTS_ABI)
 
     def get_payout_claimed_entries(self):
-        payout_claim_filter = self.contract.events.PayoutClaimed.createFilter(fromBlock='0x0')
+        payout_claim_filter = self.contract.events.FundsClaimed.createFilter(fromBlock='0x0')
         entries = payout_claim_filter.get_all_entries()
-        return [{'recipient': log['args']['recipient'].lower(), 'tx_hash': log['transactionHash'].hex() } for log in entries]
+        return [{'claimee': log['args']['claimee'].lower(), 'tx_hash': log['transactionHash'].hex() } for log in entries]
 
 
 class Command(BaseCommand):
@@ -57,7 +57,7 @@ class Command(BaseCommand):
 
         updates_completed = 0
         for event in event_logs:
-            matches = grouped_matches.get(event['recipient'], [])
+            matches = grouped_matches.get(event['claimee'], [])
 
             for match in matches:
                 self.stdout.write(f'Updating CLR Match - {match.pk}')

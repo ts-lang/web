@@ -68,8 +68,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/us
 30 1 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash sync_github  >> /var/log/gitcoin/sync_github.log  2>&1
 30 1 1,15 * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash unsubscribe_daily_emails  >> /var/log/gitcoin/unsubscribe_daily_emails.log  2>&1
 55 */5 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash get_notifications  >> /var/log/gitcoin/get_notifications.log  2>&1
-15 10 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash bounty_feedback_email  >> /var/log/gitcoin/bounty_feedback_email.log  2>&1
-15 10 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash funder_stale_email 60  >> /var/log/gitcoin/funder_stale_email.log  2>&1
 15 5 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash new_bounties_email  >> /var/log/gitcoin/new_bounties_email.log  2>&1
 # 15 10 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash tribe_hackathon_prizes_email  >> /var/log/gitcoin/tribe_hackathon_prizes_email.log  2>&1
 30 5 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash post_data quest  >> /var/log/gitcoin/post_data.log  2>&1
@@ -85,6 +83,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/us
 0 9 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash no_applicants_email  >> /var/log/gitcoin/no_applicants_email.log 2>&1
 0 10 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash pull_grant_twitter_info  >> /var/log/gitcoin/pull_grant_twitter_info.log 2>&1
 35 * * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash grants_upcoming  >> /var/log/gitcoin/grants_upcoming.log 2>&1
+1,35 * * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash grants_cv  >> /var/log/gitcoin/grants_cv.log 2>&1
 0 5 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash create_stats_snapshot  >> /var/log/gitcoin/create_stats_snapshot.log 2>&1
 0 6 * * * cd gitcoin/coin; bash scripts/run_management_command_if_not_already_running.bash ingest_community_events_calender  >> /var/log/gitcoin/ingest_community_events_calender.log 2>&1
 

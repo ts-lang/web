@@ -24,15 +24,16 @@ from grants.views import (
     cancel_grant_v1, cart_thumbnail, clr_grants, clr_matches, collage, collection_thumbnail, contribute_to_grants_v1,
     contribution_addr_from_all_as_json, contribution_addr_from_grant_as_json,
     contribution_addr_from_grant_during_round_as_json, contribution_addr_from_round_as_json,
-    contribution_info_from_grant_during_round_as_json, create_matching_pledge_v1, delete_collection, flag,
-    get_clr_sybil_input, get_collection, get_collections_list, get_ethereum_cart_data, get_grant_payload,
-    get_grant_tags, get_grants, get_interrupted_contributions, get_replaced_tx, get_trust_bonus, grant_activity,
-    grant_details, grant_details_api, grant_details_contributions, grant_details_contributors, grant_edit, grant_fund,
-    grants, grants_addr_as_json, grants_bulk_add, grants_by_grant_type, grants_cart_view, grants_info, grants_landing,
-    grants_type_redirect, hall_of_fame, ingest_contributions, ingest_contributions_view, invoice, leaderboard,
-    manage_ethereum_cart_data, matching_funds, new_matching_partner, profile, quickstart, remove_grant_from_collection,
-    save_collection, toggle_grant_favorite, upload_sybil_csv, verify_grant, ingest_merkle_claim_to_clr_match
+    contribution_info_from_grant_during_round_as_json, delete_collection, flag, get_clr_sybil_input, get_collection,
+    get_collections_list, get_ethereum_cart_data, get_grant_payload, get_grant_tags, get_grants,
+    get_interrupted_contributions, get_replaced_tx, get_trust_bonus, grant_activity, grant_details, grant_details_api,
+    grant_details_contributions, grant_details_contributors, grant_edit, grant_fund, grants, grants_addr_as_json,
+    grants_bulk_add, grants_by_grant_type, grants_cart_view, grants_info, grants_landing, grants_type_redirect,
+    hall_of_fame, ingest_contributions, ingest_contributions_view, ingest_merkle_claim_to_clr_match, invoice,
+    leaderboard, manage_ethereum_cart_data, matching_funds, profile, remove_grant_from_collection, save_collection,
+    toggle_grant_favorite, upload_sybil_csv, verify_grant,
 )
+from grants.views_api_vc import contributor_statistics, grantee_statistics
 
 app_name = 'grants/'
 urlpatterns = [
@@ -47,6 +48,9 @@ urlpatterns = [
 
     path('clr/<int:round_num>/<str:sub_round_slug>', clr_grants, name='clr_grants'),
     path('clr/<int:round_num>/<str:sub_round_slug>/', clr_grants, name='clr_grants'),
+
+    path('clr/<str:sub_round_slug>', clr_grants, name='clr_grants'),
+
 
     path('clr/<str:customer_name>/<int:round_num>', clr_grants, name='clr_grants'),
     path('clr/<str:customer_name>/<int:round_num>/', clr_grants, name='clr_grants'),
@@ -75,11 +79,8 @@ urlpatterns = [
     path('get-ethereum-cart-data', get_ethereum_cart_data, name='get_ethereum_cart_data'),
     path('get-replaced-tx', get_replaced_tx, name='get-replaced-tx'),
     re_path(r'^profile', profile, name='profile'),
-    re_path(r'^quickstart', quickstart, name='quickstart'),
     re_path(r'^hall_of_fame', hall_of_fame, name='hall_of_fame'),
     re_path(r'^leaderboard', leaderboard, name='leaderboard'),
-    re_path(r'^matching-partners/new', new_matching_partner, name='new_matching_partner'),
-    re_path(r'^v1/api/matching-pledge/create', create_matching_pledge_v1, name='create_matching_pledge_v1'),
     path(
         'invoice/contribution/<int:contribution_pk>',
         invoice,
@@ -126,4 +127,7 @@ urlpatterns = [
     path('v1/api/upload_sybil_csv', upload_sybil_csv, name='upload_sybil_csv'),
     path('v1/api/ingest_merkle_claim_to_clr_match', ingest_merkle_claim_to_clr_match, name='ingest_merkle_claim_to_clr_match'),
 
+    # VC verification API (when issuing a VC)
+    path('v1/api/vc/contributor_statistics', contributor_statistics, name='contributor_statistics'),
+    path('v1/api/vc/grantee_statistics', grantee_statistics, name='grantee_statistics'),
 ]
